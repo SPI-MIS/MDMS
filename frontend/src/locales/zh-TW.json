@@ -1,0 +1,11 @@
+{
+  "title": "模具管理系統",
+  "login": "登入",
+  "logout": "登出",
+  "user": "使用者",
+  "empId": "工號",
+  "changePassword": "更改密碼",
+  "home": "首頁",
+  "accountManage": "系統管理者",
+  "permissionManage": "權限管理者"
+}

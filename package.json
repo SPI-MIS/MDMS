@@ -1,8 +1,6 @@
 {
   "name": "mdms",
-  "version": "1.0.0",
-  "description": "## Project setup ``` npm install ```",
-  "main": "index.js",
+  "version": "1.0.0",  
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd backend && npm run dev",
@@ -19,6 +17,7 @@
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "mssql": "^11.0.1",
-    "mysql2": "^3.14.3"
+    "mysql2": "^3.14.3",
+    "vue-i18n": "^9.14.5"
   }
 }
