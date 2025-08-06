@@ -1,11 +1,14 @@
 {
-  "title": "模具管理系統",
+  "system":"模具管理系統",
   "login": "登入",
   "logout": "登出",
   "user": "使用者",
-  "empId": "工號",
+  "empId": "工號：{id}",
   "changePassword": "更改密碼",
   "home": "首頁",
-  "accountManage": "系統管理者",
-  "permissionManage": "權限管理者"
+  "settings":"模具基本資料",
+  "status":"模具狀態資料",
+  "profile":"模具履歷資料",
+  "manage":"使用者資料",
+  "accountManage": "系統管理頁面"
 }

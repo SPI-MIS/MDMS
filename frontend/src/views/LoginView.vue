@@ -10,7 +10,7 @@
     <!-- <v-container> ... </v-container> -->
       <v-container class="d-flex align-center justify-center" style="height: 100vh">
         <v-card width="400">
-        <v-card-title class="justify-center">登入模具管理系統</v-card-title>
+        <v-card-title class="justify-center">登入</v-card-title>
         <v-card-text>
           <v-form ref="loginForm" @submit.prevent="submitLogin">
             <v-text-field
