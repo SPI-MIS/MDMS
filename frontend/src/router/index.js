@@ -43,7 +43,7 @@ const routes = [
     path: '/login', 
     component: LoginView,
     meta: { title: 'system' }
-  },
+  }
 ]
 
 const router = createRouter({

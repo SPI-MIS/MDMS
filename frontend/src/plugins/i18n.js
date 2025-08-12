@@ -1,7 +1,7 @@
 import { createI18n } from 'vue-i18n'
-import zh from './locales/zh-tw.json'
-import vi from './locales/vi.json'
-import id from './locales/id.json'
+import zh from '../locales/zh-tw.json'
+import vi from '../locales/vi.json'
+import id from '../locales/id.json'
 
 const i18n = createI18n({
   locale: localStorage.getItem('lang') || 'zh-tw',

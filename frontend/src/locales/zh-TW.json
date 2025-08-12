@@ -6,9 +6,8 @@
   "empId": "工號：{id}",
   "changePassword": "更改密碼",
   "home": "首頁",
-  "settings":"模具基本資料",
-  "status":"模具狀態資料",
-  "profile":"模具履歷資料",
-  "manage":"使用者資料",
-  "accountManage": "系統管理頁面"
+  "settings":"模具資料管理",
+  "status":"模具進出管理",
+  "profile":"模具履歷管理",
+  "manage":"系統管理頁面"
 }

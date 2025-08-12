@@ -1,5 +1,14 @@
 {
-  "title": "Hệ thống quản lý khuôn mẫu",
+  "system": "Hệ thống quản lý khuôn mẫu",
   "login": "Đăng nhập",
-  "logout": "Đăng xuất"
+  "logout": "Đăng xuất",
+  "user": "người dùng",
+  "empId": "Số công việc：{id}",
+  "changePassword": "thay đổi mật khẩu",
+  "home": "trang nhất",
+  "settings":"Quản lý dữ liệu khuôn mẫu",
+  "status":"Quản lý nấm mốc trong và ngoài",
+  "profile":"Quản lý lịch sử nấm mốc",
+  "manage":"Thông tin người dùng",
+  "accountManage": "Trang quản lý hệ thống"
 }

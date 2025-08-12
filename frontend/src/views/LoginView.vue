@@ -43,7 +43,9 @@
 import { ref } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth';
 import HeaderBar from '@/components/HeaderBar.vue'
+
 
 const username = ref('')
 const password = ref('')
@@ -51,6 +53,7 @@ const manager = ref('')
 const loading = ref(false)
 const error = ref('')
 const router = useRouter()
+const { login } = useAuth();
 const emit = defineEmits(['login-success'])
 
 const submitLogin = async () => {
@@ -58,7 +61,7 @@ const submitLogin = async () => {
   error.value = ''
 
   try {
-    const res = await axios.post('http://localhost:3000/api/login', {
+    const res = await axios.post('/api/login', {
       username: username.value,
       password: password.value
     })
@@ -68,13 +71,19 @@ const submitLogin = async () => {
 
     emit('login-success', { userId, userName, manager })
 
-    localStorage.setItem('userId', userId)
-    localStorage.setItem('userName', userName)
-    localStorage.setItem('manager', manager)
+    if (res.data.success) {
+      login({
+        userId: res.data.userId,
+        userName: res.data.userName,
+        manager: res.data.manager
+      });
 
-    router.push('/')
+      router.push('/'); // 導向首頁
+    } else {
+      error.value = '登入失敗，請檢查帳密';
+    }
   } catch (err) {
-    error.value = '登入失敗，請確認帳號密碼'
+    error.value = err.response?.data?.message || '系統錯誤，請稍後再試';
   }
 }
 </script>

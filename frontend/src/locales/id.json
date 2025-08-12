@@ -1,5 +1,14 @@
 {
-  "title": "Sistem manajemen cetakan",
+  "system": "Sistem manajemen cetakan",
   "login": "Masuk",
-  "logout": "Keluar"
+  "logout": "Keluar",
+  "user": "pengguna",
+  "empId": "Nomor Pekerjaan：{id}",
+  "changePassword": "ubah kata sandi",
+  "home": "halaman depan",
+  "settings":"Manajemen data cetakan",
+  "status":"Manajemen masuk dan keluarnya jamur",
+  "profile":"Manajemen riwayat cetakan",
+  "manage":"Informasi Pengguna",
+  "accountManage": "Halaman manajemen sistem"
 }

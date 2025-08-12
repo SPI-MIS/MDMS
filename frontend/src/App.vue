@@ -1,7 +1,11 @@
 <template>
   <v-app>
-    <HeaderBar :user-id="userId" :user-name="userName" :manager="manager" />
-    <router-view @login-success="updateUser" />
+    <v-layout>
+      <HeaderBar :user-id="userId" :user-name="userName" :manager="manager" />
+      <v-main>          <!-- 內容會自動避開上方 App Bar -->
+        <router-view @login-success="updateUser" />
+      </v-main>
+    </v-layout>    
   </v-app>
 </template>
 
