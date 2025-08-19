@@ -6,6 +6,7 @@ import ProfileView from '@/views/ProfileView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import StatusView from '@/views/StatusView.vue';
 import ManageView from '@/views/ManageView.vue';
+import moldTypeForm from '@/views/MoldtypeForm.vue';
 
 const routes = [
   // { path: '/login', redirect: '/login' },
@@ -42,6 +43,11 @@ const routes = [
   { 
     path: '/login', 
     component: LoginView,
+    meta: { title: 'system' }
+  },
+  { 
+    path: '/mold-type', 
+    component: moldTypeForm,
     meta: { title: 'system' }
   }
 ]

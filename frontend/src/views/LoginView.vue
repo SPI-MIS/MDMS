@@ -1,11 +1,11 @@
 <template>   
   <v-app>
     <!-- 頂部欄 -->
-    <HeaderBar
+    <!-- <HeaderBar
       :user-id="userId"
       :user-name="userName"
       :manager="manager"
-    />
+    /> -->
     <!-- 登入頁主內容 -->
     <!-- <v-container> ... </v-container> -->
       <v-container class="d-flex align-center justify-center" style="height: 100vh">
@@ -44,12 +44,12 @@ import { ref } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth';
-import HeaderBar from '@/components/HeaderBar.vue'
+// import HeaderBar from '@/components/HeaderBar.vue'
 
 
 const username = ref('')
 const password = ref('')
-const manager = ref('')
+// const manager = ref('')
 const loading = ref(false)
 const error = ref('')
 const router = useRouter()
