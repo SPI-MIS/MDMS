@@ -3,22 +3,22 @@ const router = express.Router();
 const { sql, getPool } = require('../db/db_SMS');
 
 /** 查詢(清單) ?q=keyword&state=N/Y/V */
-router.get('/molds', async (req, res) => {
+router.get('/moldC', async (req, res) => {
   const { q = '', state = '' } = req.query;
   try {
     const pool = await getPool();
     const request = pool.request();
     request.input('q', sql.NVarChar, `%${q}%`);
-    let where = 'WHERE (MA001 LIKE @q OR MA003 LIKE @q)';
+    let where = 'WHERE (MB001 LIKE @q OR MB003 LIKE @q)';
     if (state) {
       request.input('state', sql.NVarChar, state);
       where += ' AND IssueState = @state';
     }
     const rs = await request.query(`
-      SELECT MA001, MA002, MA003, IssueState, Creator, CreateDate
-      FROM dbo.SMSMA
+      SELECT MB001, MB002, MB003, IssueState, Creator, CreateDate
+      FROM dbo.SMSMB
       ${where}
-      ORDER BY MA001
+      ORDER BY MB001
     `);
     res.json(rs.recordset);
   } catch (err) {
@@ -27,14 +27,14 @@ router.get('/molds', async (req, res) => {
 });
 
 /** 取單筆 */
-router.get('/molds/:id', async (req, res) => {
+router.get('/moldC/:id', async (req, res) => {
   try {
     const pool = await getPool();
     const rs = await pool.request()
       .input('id', sql.NVarChar, req.params.id)
       .query(`
-        SELECT MA001, MA002, MA003, IssueState, Creator, CreateDate
-        FROM dbo.SMSMA WHERE MA001 = @id
+        SELECT MB001, MB002, MB003, IssueState, Creator, CreateDate
+        FROM dbo.SMSMB WHERE MB001 = @id
       `);
     if (rs.recordset.length === 0) return res.status(404).json({ error: 'not found' });
     res.json(rs.recordset[0]);
@@ -44,16 +44,16 @@ router.get('/molds/:id', async (req, res) => {
 });
 
 /** 新增 - 修正版本 */
-router.post('/molds', async (req, res) => {
+router.post('/moldC', async (req, res) => {
   console.log('=== 新增請求開始 ===');
   console.log('Request body:', req.body);
   
-  const { MA001, MA002 = 'N', MA003 = '', Creator = '' } = req.body;
+  const { MB001, MB002 = 'N', MB003 = '', Creator = '' } = req.body;
   
   // 基本驗證
-  if (!MA001 || typeof MA001 !== 'string' || !MA001.trim()) {
-    console.log('MA001 驗證失敗:', MA001);
-    return res.status(400).json({ error: 'MA001 is required and must be a non-empty string' });
+  if (!MB001 || typeof MB001 !== 'string' || !MB001.trim()) {
+    console.log('MB001 驗證失敗:', MB001);
+    return res.status(400).json({ error: 'MB001 is required and must be a non-empty string' });
   }
   
   try {
@@ -63,21 +63,21 @@ router.post('/molds', async (req, res) => {
     
     console.log('準備執行 SQL...');
     console.log('參數:', {
-      MA001: MA001.trim(),
-      MA002: MA002,
-      MA003: MA003 || '',
+      MB001: MB001.trim(),
+      MB002: MB002,
+      MB003: MB003 || '',
       Creator: Creator || 'SYSTEM'
     });
     
     const request = pool.request();
-    request.input('MA001', sql.NVarChar, MA001.trim());
-    request.input('MA002', sql.NVarChar, MA002);
-    request.input('MA003', sql.NVarChar, MA003 || '');
+    request.input('MB001', sql.NVarChar, MB001.trim());
+    request.input('MB002', sql.NVarChar, MB002);
+    request.input('MB003', sql.NVarChar, MB003 || '');
     request.input('Creator', sql.NVarChar, Creator || 'SYSTEM');
     
     const result = await request.query(`
-      INSERT INTO dbo.SMSMA(MA001, MA002, MA003, IssueState, Creator, CreateDate)
-      VALUES(@MA001, @MA002, @MA003, 'N', @Creator, GETDATE())
+      INSERT INTO dbo.SMSMB(MB001, MB002, MB003, IssueState, Creator, CreateDate)
+      VALUES(@MB001, @MB002, @MB003, 'N', @Creator, GETDATE())
     `);
     
     console.log('SQL 執行成功:', result);
@@ -88,9 +88,9 @@ router.post('/molds', async (req, res) => {
       success: true,
       message: '新增成功',
       data: {
-        MA001: MA001.trim(),
-        MA002: MA002,
-        MA003: MA003 || '',
+        MB001: MB001.trim(),
+        MB002: MB002,
+        MB003: MB003 || '',
         Creator: Creator || 'SYSTEM'
       }
     });
@@ -107,7 +107,7 @@ router.post('/molds', async (req, res) => {
       return res.status(400).json({ 
         success: false,
         error: 'duplicate key',
-        message: `模具種類 "${MA001}" 已存在`
+        message: `模具種類 "${MB001}" 已存在`
       });
     }
     
@@ -131,10 +131,10 @@ router.post('/molds', async (req, res) => {
 });
 
 /** 修改 - 加強錯誤處理 */
-router.put('/molds/:id', async (req, res) => {
+router.put('/moldC/:id', async (req, res) => {
   console.log('收到修改請求:', { id: req.params.id, body: req.body });
   
-  const { MA002, MA003, IssueState } = req.body;
+  const { MB002, MB003 } = req.body;
   const id = req.params.id;
   
   if (!id || !id.trim()) {
@@ -148,7 +148,7 @@ router.put('/molds/:id', async (req, res) => {
     // 檢查記錄是否存在及狀態
     const rs = await pool.request()
       .input('id', sql.NVarChar, id.trim())
-      .query(`SELECT IssueState FROM dbo.SMSMA WHERE MA001=@id`);
+      .query(`SELECT IssueState FROM dbo.SMSMB WHERE MB001=@id`);
     
     if (rs.recordset.length === 0) {
       console.error('記錄不存在:', id);
@@ -164,10 +164,10 @@ router.put('/molds/:id', async (req, res) => {
 
     // 執行更新
     const result = await pool.request()
-      .input('IssueState', sql.NVarChar, IssueState || '')
-      // .input('MA003', sql.NVarChar, MA003 || '')
+      .input('MB002', sql.NVarChar, MB002 || 'N')
+      .input('MB003', sql.NVarChar, MB003 || '')
       .input('id', sql.NVarChar, id.trim())
-      .query(`UPDATE dbo.SMSMA SET IssueState=@IssueState WHERE MA001=@id`);
+      .query(`UPDATE dbo.SMSMB SET IssueState=@IssueState WHERE MB001=@id`);
     
     console.log('修改成功:', result);
     res.json({ success: true, message: '修改成功' });
@@ -182,18 +182,18 @@ router.put('/molds/:id', async (req, res) => {
 });
 
 /** 刪除（僅未核准/未作廢可刪） */
-router.delete('/molds/:id', async (req, res) => {
+router.delete('/moldC/:id', async (req, res) => {
   try {
     const pool = await getPool();
     const rs = await pool.request()
       .input('id', sql.NVarChar, req.params.id)
-      .query(`SELECT IssueState FROM dbo.SMSMA WHERE MA001=@id`);
+      .query(`SELECT IssueState FROM dbo.SMSMB WHERE MB001=@id`);
     if (rs.recordset.length === 0) return res.status(404).json({ error: 'not found' });
     const state = rs.recordset[0].IssueState;
     if (state !== 'N') return res.status(400).json({ error: 'only N can delete' });
 
     await pool.request().input('id', sql.NVarChar, req.params.id)
-      .query(`DELETE FROM dbo.SMSMA WHERE MA001=@id`);
+      .query(`DELETE FROM dbo.SMSMB WHERE MB001=@id`);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -201,23 +201,23 @@ router.delete('/molds/:id', async (req, res) => {
 });
 
 /** 複製：以既有鍵 + 後綴產生新鍵 */
-router.post('/molds/:id/copy', async (req, res) => {
-  const { newId } = req.body; // 前端提供新 MA001
+router.post('/moldC/:id/copy', async (req, res) => {
+  const { newId } = req.body; // 前端提供新 MB001
   try {
     const pool = await getPool();
     const src = await pool.request().input('id', sql.NVarChar, req.params.id)
-      .query(`SELECT * FROM dbo.SMSMA WHERE MA001=@id`);
+      .query(`SELECT * FROM dbo.SMSMB WHERE MB001=@id`);
     if (src.recordset.length === 0) return res.status(404).json({ error: 'source not found' });
 
     const r = src.recordset[0];
     await pool.request()
-      .input('MA001', sql.NVarChar, newId)
-      .input('MA002', sql.NVarChar, r.MA002)
-      .input('MA003', sql.NVarChar, r.MA003)
+      .input('MB001', sql.NVarChar, newId)
+      .input('MB002', sql.NVarChar, r.MB002)
+      .input('MB003', sql.NVarChar, r.MB003)
       .input('Creator', sql.NVarChar, r.Creator)
       .query(`
-        INSERT INTO dbo.SMSMA(MA001, MA002, MA003, IssueState, Creator, CreateDate)
-        VALUES(@MA001, @MA002, @MA003, 'N', @Creator, GETDATE())
+        INSERT INTO dbo.SMSMB(MB001, MB002, MB003, IssueState, Creator, CreateDate)
+        VALUES(@MB001, @MB002, @MB003, 'N', @Creator, GETDATE())
       `);
     res.json({ success: true, newId });
   } catch (err) {
@@ -226,16 +226,16 @@ router.post('/molds/:id/copy', async (req, res) => {
 });
 
 /** 核准 → IssueState = 'Y'（僅 N 可核准） */
-router.post('/molds/:id/approve', async (req, res) => {
+router.post('/moldC/:id/approve', async (req, res) => {
   try {
     const pool = await getPool();
     const rs = await pool.request().input('id', sql.NVarChar, req.params.id)
-      .query(`SELECT IssueState FROM dbo.SMSMA WHERE MA001=@id`);
+      .query(`SELECT IssueState FROM dbo.SMSMB WHERE MB001=@id`);
     if (rs.recordset.length === 0) return res.status(404).json({ error: 'not found' });
     if (rs.recordset[0].IssueState !== 'N') return res.status(400).json({ error: 'only N can approve' });
 
     await pool.request().input('id', sql.NVarChar, req.params.id)
-      .query(`UPDATE dbo.SMSMA SET IssueState='Y' WHERE MA001=@id`);
+      .query(`UPDATE dbo.SMSMB SET IssueState='Y' WHERE MB001=@id`);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -243,16 +243,16 @@ router.post('/molds/:id/approve', async (req, res) => {
 });
 
 /** 取消核准 → IssueState = 'N'（僅 Y 可取消） */
-router.post('/molds/:id/unapprove', async (req, res) => {
+router.post('/moldC/:id/unapprove', async (req, res) => {
   try {
     const pool = await getPool();
     const rs = await pool.request().input('id', sql.NVarChar, req.params.id)
-      .query(`SELECT IssueState FROM dbo.SMSMA WHERE MA001=@id`);
+      .query(`SELECT IssueState FROM dbo.SMSMB WHERE MB001=@id`);
     if (rs.recordset.length === 0) return res.status(404).json({ error: 'not found' });
     if (rs.recordset[0].IssueState !== 'Y') return res.status(400).json({ error: 'only Y can unapprove' });
 
     await pool.request().input('id', sql.NVarChar, req.params.id)
-      .query(`UPDATE dbo.SMSMA SET IssueState='N' WHERE MA001=@id`);
+      .query(`UPDATE dbo.SMSMB SET IssueState='N' WHERE MB001=@id`);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -260,16 +260,16 @@ router.post('/molds/:id/unapprove', async (req, res) => {
 });
 
 /** 作廢 → IssueState = 'V'（N / Y 可作廢；作廢後不可再改） */
-router.post('/molds/:id/void', async (req, res) => {
+router.post('/moldC/:id/void', async (req, res) => {
   try {
     const pool = await getPool();
     const rs = await pool.request().input('id', sql.NVarChar, req.params.id)
-      .query(`SELECT IssueState FROM dbo.SMSMA WHERE MA001=@id`);
+      .query(`SELECT IssueState FROM dbo.SMSMB WHERE MB001=@id`);
     if (rs.recordset.length === 0) return res.status(404).json({ error: 'not found' });
     if (rs.recordset[0].IssueState === 'V') return res.status(400).json({ error: 'already void' });
 
     await pool.request().input('id', sql.NVarChar, req.params.id)
-      .query(`UPDATE dbo.SMSMA SET IssueState='V' WHERE MA001=@id`);
+      .query(`UPDATE dbo.SMSMB SET IssueState='V' WHERE MB001=@id`);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

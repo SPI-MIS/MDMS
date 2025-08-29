@@ -75,7 +75,8 @@ const submitLogin = async () => {
       login({
         userId: res.data.userId,
         userName: res.data.userName,
-        manager: res.data.manager
+        manager: res.data.manager,
+        perms:    res.data.perms     // { C,R,U,D,A } booleans
       });
 
       router.push('/'); // 導向首頁

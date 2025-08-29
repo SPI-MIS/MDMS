@@ -7,6 +7,7 @@ import SettingsView from '@/views/SettingsView.vue';
 import StatusView from '@/views/StatusView.vue';
 import ManageView from '@/views/ManageView.vue';
 import moldTypeForm from '@/views/MoldtypeForm.vue';
+import moldCategoryForm from '@/views/MoldCategoryForm.vue';
 
 const routes = [
   // { path: '/login', redirect: '/login' },
@@ -26,7 +27,17 @@ const routes = [
     path: '/settings',
     name: 'settings',
     component: SettingsView,
-    meta: { title: 'settings' }
+    meta: { title: 'settings.home' }
+  },
+  { 
+    path: '/mold-type', 
+    component: moldTypeForm,
+    meta: { title: 'settings.moldTypeForm' }
+  },
+  { 
+    path: '/mold-category', 
+    component: moldCategoryForm,
+    meta: { title: 'settings.moldCategory' }
   },
   {
     path: '/status',
@@ -43,11 +54,6 @@ const routes = [
   { 
     path: '/login', 
     component: LoginView,
-    meta: { title: 'system' }
-  },
-  { 
-    path: '/mold-type', 
-    component: moldTypeForm,
     meta: { title: 'system' }
   }
 ]

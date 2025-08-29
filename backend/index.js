@@ -11,6 +11,8 @@ app.use('/api', require('./routes/user'))
 
 app.use('/api', require('./routes/molds'))
 
+app.use('/api', require('./routes/moldC'))
+
 app.listen(3000, () => {
   console.log('✅ Backend running on http://localhost:3000')
 })

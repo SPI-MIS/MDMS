@@ -1,5 +1,4 @@
-<template>
-  
+<template>  
   <!-- 側邊欄 -->
   <v-navigation-drawer v-model="drawer" temporary location="left" >
     <v-list density="compact" nav>
@@ -12,28 +11,28 @@
       <v-list-group prepend-icon="mdi-database">
         <template #activator="{ props }">
           <v-list-item v-bind="props" @click="goTo('/settings')">
-            <v-list-item-title>{{ $t('settings') }}</v-list-item-title>
+            <v-list-item-title>{{ $t('settings.home') }}</v-list-item-title>
           </v-list-item>
         </template>
 
         <v-list-item @click="goTo('/mold-type')">
-          <v-list-item-title>模具種類</v-list-item-title>
+          <v-list-item-title>{{ $t('settings.moldTypeForm') }}</v-list-item-title>
         </v-list-item>
 
         <v-list-item @click="goTo('/mold-category')">
-          <v-list-item-title>模具分類</v-list-item-title>
+          <v-list-item-title>{{ $t('settings.moldCategory') }}</v-list-item-title>
         </v-list-item>
 
         <v-list-item @click="goTo('/material')">
-          <v-list-item-title>材質</v-list-item-title>
+          <v-list-item-title>{{ $t('settings.material') }}</v-list-item-title>
         </v-list-item>
 
         <v-list-item @click="goTo('/vendor')">
-          <v-list-item-title>廠商資料</v-list-item-title>
+          <v-list-item-title>{{ $t('settings.vendor') }}</v-list-item-title>
         </v-list-item>
 
         <v-list-item @click="goTo('/mold-basic')">
-          <v-list-item-title>模具基本資料</v-list-item-title>
+          <v-list-item-title>{{ $t('settings.moldBasic') }}</v-list-item-title>
         </v-list-item>
       </v-list-group>
 
@@ -92,83 +91,104 @@
     </v-list>
   </v-navigation-drawer>
  
-  <v-app-bar flat dense color="blue lighten-1" class="px-4" dark>
-    <v-container fluid>
-      <v-row align="center" justify="space-between">
-        <!-- 左側：LOGO + 系統名稱 -->
-        <v-col cols="auto" md="6" class="d-flex align-center px-0">
-           <!-- 打開側邊欄的按鈕 / LOGO -->
-          <v-btn icon @click="drawer = !drawer">
-            <img src="@/assets/logo.svg" alt="Logo" height="28" />
+  <v-app-bar flat density="comfortable" color="primary">
+  <!-- 左：手機漢堡鍵 + Logo + 標題 -->
+  <v-app-bar-nav-icon class="d-md-none" @click="drawer = true" />
+  <v-btn icon class="d-none d-md-inline-flex" @click="drawer = !drawer">
+    <img src="@/assets/logo.svg" alt="Logo" height="28" />
+  </v-btn>
+  <v-toolbar-title class="text-h6"> {{ route.meta?.title ? $t(route.meta.title) : '' }} </v-toolbar-title>
+
+  <v-spacer />
+
+  <!-- 右：桌機完整操作 -->
+  <div class="d-none d-md-flex align-center" style="gap: 8px;">
+    <template v-if="userId && userName">
+      <v-menu offset-y>
+        <template #activator="{ props }">
+          <v-btn v-bind="props" variant="text" class="text-white text-decoration-underline">
+            {{ userName }} 您好！<v-icon end>mdi-menu-down</v-icon>
           </v-btn>
-          <div class="text-h6 font-weight-bold pa-0 ma-0"> {{ route.meta?.title ? $t(route.meta.title) : '' }}</div>
-        </v-col>
+        </template>
+        <v-list density="compact">
+          <v-list-item>
+            <v-list-item-title>{{ $t('empId', { id: userId || '' }) }}</v-list-item-title>
+          </v-list-item>
+          <v-divider class="my-1" />
+          <v-list-item @click="changePassword">
+            <v-list-item-title>{{ $t('changePassword') }}</v-list-item-title>
+          </v-list-item>
+          <v-list-item @click="goTo('/')">
+            <v-list-item-title>{{ $t('home') }}</v-list-item-title>
+          </v-list-item>
+          <v-divider class="my-1" />
+          <v-list-item v-if="String(manager) === '1'" @click="goTo('/manage')">
+            <v-list-item-title>{{ $t('manage') }}</v-list-item-title>
+          </v-list-item>
+          <v-list-item @click="logout">
+            <v-list-item-title>{{ $t('logout') }}</v-list-item-title>
+          </v-list-item>
+        </v-list>
+      </v-menu>
+    </template>
+    <v-btn v-else variant="text" class="text-white text-decoration-underline" @click="goTo('/login')">
+      {{ $t('login') }}
+    </v-btn>
 
-        <!-- <v-col cols="auto" class="d-flex justify-center">
-          <v-sheet class="pa-2 ma-2"> {{ route.meta?.title ? $t(route.meta.title) : '' }}</v-sheet>
-        </v-col> -->
+    <!-- 語系：桌機用 v-select，變窄不會撐開 -->
+    <v-select v-model="lang" :items="languages" item-value="key" style="max-width: 80px;" @change="changeLang" return-object>
+      <template v-slot:item="{ props: itemProps, item }">
+        <v-list-item>
+          <div class="d-flex align-center">
+            <v-img v-bind="itemProps" :src="item.raw.image" aspect-ratio="1.6" class="mr-2 rounded-sm" cover />
+          </div>       
+        </v-list-item>
+      </template>    
+      
+      <template v-slot:selection="{ item }">
+        <div class="d-flex align-center">
+          <v-img :src="item.raw.image" width="30" aspect-ratio="1.6" class="mr-2 rounded-sm" cover />
+        </div>
+      </template>
+    </v-select>
+  </div>
 
-        <!-- 右側：使用者姓名選單 -->
-        <v-col cols="auto" md="3" class="d-flex justify-end align-center">
-          <v-menu v-if="userId && userName" offset-y>
-            <template #activator="{ props }">
-              <v-btn v-bind="props" variant="text" class="white--text text-decoration-underline">
-                {{ userName }} 您好！ 
-                <v-icon right>mdi-menu-down</v-icon>
-              </v-btn>
-            </template>
-            <v-list density="compact">
-              <v-list-item>
-                <v-list-item-title>{{ $t('empId', { id: userId || '' }) }}</v-list-item-title>
-              </v-list-item>
-              <v-divider class="my-1" />
-              <v-list-item @click="changePassword">
-                <v-list-item-title>{{ $t('changePassword') }}</v-list-item-title>
-              </v-list-item>
-              <v-list-item @click="goTo('/')">
-                <v-list-item-title>{{ $t('home') }}</v-list-item-title>
-              </v-list-item>
-              <v-divider class="my-1" />
+  <!-- 右：手機精簡操作（更多） -->
+  <v-menu v-if="!mdAndUp" location="bottom end">
+    <template #activator="{ props }">
+      <v-btn icon v-bind="props"><v-icon>mdi-dots-vertical</v-icon></v-btn>
+    </template>
+    <v-list density="compact">
+      <v-list-item v-if="userId && userName">
+        <v-list-item-title>{{ userName }}</v-list-item-title>
+      </v-list-item>
+      <v-list-item @click="goTo('/')" title="首頁" />
+      <v-list-item v-if="String(manager) === '1'" @click="goTo('/manage')" title="系統管理" />
+      <v-list-item v-if="userId && userName" @click="changePassword" title="變更密碼" />
+      <v-list-item v-if="userId && userName" @click="logout" title="登出" />
+      <v-list-item v-else @click="goTo('/login')" title="登入" />
+      <v-divider class="my-1" />
+      <!-- 語系：手機用簡單清單 -->
+      <v-subheader>Language</v-subheader>
+      <v-list-item v-for="l in languages" :key="l.key" @click="lang = l; changeLang()" >
+        <div class="d-flex align-center" style="gap:8px;">
+          <v-img :src="l.image" width="28" aspect-ratio="1.6" class="rounded-sm" cover />
+        </div>
+      </v-list-item>
+    </v-list>
+  </v-menu>
+</v-app-bar>
 
-              <v-list-item @click="goTo('/manage')" v-if="String(manager) === '1'">
-                <v-list-item-title>{{ $t('manage') }}</v-list-item-title>
-              </v-list-item>              
-              <v-list-item @click="logout">
-                <v-list-item-title>{{ $t('logout') }}</v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
-          <v-btn v-else variant="text" class="white--text text-decoration-underline" @click="goTo('/login')"> {{ $t('login') }} </v-btn>
-          
-          <!-- 國旗語系切換 -->
-          <v-select v-model="lang" :items="languages" item-value="key" style="max-width: 80px;" @change="changeLang" return-object>
-            <template v-slot:item="{ props: itemProps, item }">
-              <v-list-item>
-                <div class="d-flex align-center">
-                  <v-img v-bind="itemProps" :src="item.raw.image" aspect-ratio="1.6" class="mr-2 rounded-sm" cover />
-                </div>       
-              </v-list-item>
-            </template>    
-            
-            <template v-slot:selection="{ item }">
-              <div class="d-flex align-center">
-                <v-img :src="item.raw.image" width="30" aspect-ratio="1.6" class="mr-2 rounded-sm" cover />
-              </div>
-            </template>
-          </v-select>
-
-        </v-col>
-      </v-row>
-    </v-container>
-  </v-app-bar>
 </template>
 
 <script setup>
+import { useDisplay } from 'vuetify'
 import { useI18n } from 'vue-i18n';
 import { useRouter, useRoute } from 'vue-router';
 import { ref, onMounted ,watch } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 
+const { mdAndUp } = useDisplay()  // true 表示 ≥ sm
 const { isLoggedIn, logout } = useAuth();
 const drawer = ref(false);
 const route = useRoute();

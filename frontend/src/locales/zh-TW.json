@@ -6,7 +6,14 @@
   "empId": "工號：{id}",
   "changePassword": "更改密碼",
   "home": "首頁",
-  "settings":"模具資料管理",
+  "settings":{
+    "home":"模具資料管理",
+    "moldTypeForm":"模具種類資料管理",
+    "moldCategory":"模具分類資料管理",
+    "material":"模具材質資料管理",
+    "vendor":"廠商資料管理",
+    "moldBasic":"模具基本資料管理"
+  },  
   "status":"模具進出管理",
   "profile":"模具履歷管理",
   "manage":"系統管理頁面"
