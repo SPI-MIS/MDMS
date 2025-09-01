@@ -1,0 +1,28 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: website_backend
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - webnet
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: website_frontend
+    ports:
+      - "8180:80"   # 對外 8180，Nginx 裡是 8080
+    depends_on:
+      - backend
+    networks:
+      - webnet
+
+networks:
+  webnet:
+    driver: bridge

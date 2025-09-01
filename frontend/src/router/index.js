@@ -27,17 +27,17 @@ const routes = [
     path: '/settings',
     name: 'settings',
     component: SettingsView,
-    meta: { title: 'settings.home' }
+    meta: { title: 'settings' }
   },
   { 
     path: '/mold-type', 
     component: moldTypeForm,
-    meta: { title: 'settings.moldTypeForm' }
+    meta: { title: 'moldTypeForm' }
   },
   { 
     path: '/mold-category', 
     component: moldCategoryForm,
-    meta: { title: 'settings.moldCategory' }
+    meta: { title: 'moldCategory' }
   },
   {
     path: '/status',

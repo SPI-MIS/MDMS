@@ -2,13 +2,14 @@ import { fileURLToPath, URL } from 'node:url'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import vueDevTools from 'vite-plugin-vue-devtools'
+// import vueDevTools from 'vite-plugin-vue-devtools'
+
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
-    vueDevTools(),
+    // vueDevTools(),
   ],
   resolve: {
     alias: {
@@ -16,9 +17,12 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',
+    port: 8080,
+    allowedHosts: ['mdms.southplastic.com'],
     proxy: {
       '/api': {
-        target: 'http://localhost:3000', // 後端實際位置
+        target: 'http://website_backend:3000', // ⭐ 用容器名稱，不是 localhost
         changeOrigin: true,
         secure: false
       }

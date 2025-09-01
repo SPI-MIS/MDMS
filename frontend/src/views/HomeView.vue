@@ -4,7 +4,7 @@
       <!-- 模具基本資料 -->
       <v-col cols="12" sm="4">
         <v-btn block height="120" color="primary" class="text-h5 font-weight-bold" @click="goTo('settings')" > 
-          <div style="white-space: normal; line-height: 1.2;">{{ $t('settings.home') }}</div></v-btn>
+          <div style="white-space: normal; line-height: 1.2;">{{ $t('settings') }}</div></v-btn>
       </v-col>
 
       <!-- 模具狀態 -->

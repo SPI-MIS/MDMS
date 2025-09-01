@@ -10,7 +10,8 @@ const i18n = createI18n({
     'zh-tw': zh,
     vi,
     id
-  }
+  },
+  flatJson: false 
 })
 
 console.log('i18n messages', { zh, vi, id })

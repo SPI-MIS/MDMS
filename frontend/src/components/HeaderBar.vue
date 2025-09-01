@@ -11,28 +11,28 @@
       <v-list-group prepend-icon="mdi-database">
         <template #activator="{ props }">
           <v-list-item v-bind="props" @click="goTo('/settings')">
-            <v-list-item-title>{{ $t('settings.home') }}</v-list-item-title>
+            <v-list-item-title>{{ $t('settings') }}</v-list-item-title>
           </v-list-item>
         </template>
 
         <v-list-item @click="goTo('/mold-type')">
-          <v-list-item-title>{{ $t('settings.moldTypeForm') }}</v-list-item-title>
+          <v-list-item-title>{{ $t('moldTypeForm') }}</v-list-item-title>
         </v-list-item>
 
         <v-list-item @click="goTo('/mold-category')">
-          <v-list-item-title>{{ $t('settings.moldCategory') }}</v-list-item-title>
+          <v-list-item-title>{{ $t('moldCategory') }}</v-list-item-title>
         </v-list-item>
 
         <v-list-item @click="goTo('/material')">
-          <v-list-item-title>{{ $t('settings.material') }}</v-list-item-title>
+          <v-list-item-title>{{ $t('material') }}</v-list-item-title>
         </v-list-item>
 
         <v-list-item @click="goTo('/vendor')">
-          <v-list-item-title>{{ $t('settings.vendor') }}</v-list-item-title>
+          <v-list-item-title>{{ $t('vendor') }}</v-list-item-title>
         </v-list-item>
 
         <v-list-item @click="goTo('/mold-basic')">
-          <v-list-item-title>{{ $t('settings.moldBasic') }}</v-list-item-title>
+          <v-list-item-title>{{ $t('moldBasic') }}</v-list-item-title>
         </v-list-item>
       </v-list-group>
 
