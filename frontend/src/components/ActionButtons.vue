@@ -1,25 +1,60 @@
 <template>
   <v-card-text class="d-flex flex-wrap gap-2">
-    <v-btn class="mx-1" icon="mdi-plus-outline" density="comfortable"
-           :disabled="!canNewBtn" @click="$emit('new')" />
+    <v-tooltip text="新增">
+      <template #activator="{ props }">
+        <span v-bind="props">
+          <v-btn class="mx-1" icon="mdi-plus-outline" density="comfortable" :disabled="!canNewBtn" @click="$emit('new')" />
+        </span>
+      </template>
+    </v-tooltip>
 
-    <v-btn class="mx-1" icon="mdi-account-search-outline" density="comfortable"
-           :disabled="!canSearchBtn" @click="$emit('search')" />
+    <v-tooltip text="查詢">
+      <template #activator="{ props }">
+        <span v-bind="props">
+          <v-btn class="mx-1" icon="mdi-account-search-outline" density="comfortable" :disabled="!canSearchBtn || !isLoggedIn" @click="$emit('search')" />
+        </span>
+        </template>
+    </v-tooltip>
 
-    <v-btn class="mx-1" icon="mdi-trash-can-outline" density="comfortable" color="error"
-           :disabled="!canDeleteBtn" @click="$emit('delete')" />
+    <v-tooltip text="刪除">
+      <template #activator="{ props }">
+        <span v-bind="props">
+          <v-btn class="mx-1" icon="mdi-trash-can-outline" density="comfortable" color="error" :disabled="!canDelete" @click="$emit('delete')" />
+        </span>
+        </template>
+    </v-tooltip>
 
-    <v-btn class="mx-1" icon="mdi-content-copy" density="comfortable"
-           :disabled="!canCopyBtn" @click="$emit('copy')" />
+    <v-tooltip text="複製">
+      <template #activator="{ props }">
+        <span v-bind="props">
+          <v-btn class="mx-1" icon="mdi-content-copy" density="comfortable" :disabled="!canCopy" @click="$emit('copy')" />
+        </span>
+        </template>
+    </v-tooltip>
 
-    <v-btn class="mx-1" icon="mdi-tag-check-outline" density="comfortable" color="success"
-           :disabled="!canApproveBtn" @click="$emit('approve')" />
+    <v-tooltip text="核准">
+      <template #activator="{ props }">
+        <span v-bind="props">
+          <v-btn class="mx-1" icon="mdi-tag-check-outline" density="comfortable" color="success" :disabled="!canApprove" @click="$emit('approve')" />
+        </span>
+        </template>
+    </v-tooltip>
 
-    <v-btn class="mx-1" icon="mdi-tag-remove-outline" density="comfortable" color="warning"
-           :disabled="!canUnapproveBtn" @click="$emit('unapprove')" />
+    <v-tooltip text="取消核准">
+      <template #activator="{ props }">
+        <span v-bind="props">
+          <v-btn class="mx-1" icon="mdi-tag-remove-outline" density="comfortable" color="warning" :disabled="!canUnapprove" @click="$emit('unapprove')" />
+        </span>
+        </template>
+    </v-tooltip>
 
-    <v-btn class="mx-1" icon="mdi-tag-off-outline" density="comfortable" color="grey"
-           :disabled="!canVoidBtn" @click="$emit('void')" />
+    <v-tooltip text="作廢">
+      <template #activator="{ props }">
+        <span>
+          <v-btn v-bind="props" class="mx-1" icon="mdi-tag-off-outline" density="comfortable" color="brown" v-ripple="{ class: 'text-red' }" :disabled="!canVoid" @click="$emit('void')" />
+        </span>
+        </template>
+    </v-tooltip>
   </v-card-text>
 </template>
 
@@ -27,14 +62,23 @@
 import { computed } from 'vue'
 import { useAuth } from '@/composables/useAuth'
 
+const { perms, manager, isLoggedIn } = useAuth()
 const props = defineProps({
   isNew: { type: Boolean, default: true },
-  // 傳進來單據狀態：'N' | 'Y' | 'V'
   issueState: { type: String, default: 'N' },
+
+  canNew:       Boolean,
+  canSearch:    Boolean,
+  canDelete:    Boolean,
+  canCopy:      Boolean,
+  canApprove:   Boolean,
+  canUnapprove: Boolean,
+  canVoid:      Boolean,
 })
+
+console.log('props:', props);
 defineEmits(['new','search','delete','copy','approve','unapprove','void'])
 
-const { perms, manager } = useAuth()
 const isManager       = computed(() => String(manager.value) === '1')
 const canCreatePerm   = computed(() => isManager.value || !!perms.value.C)
 const canReadPerm     = computed(() => isManager.value || !!perms.value.R)
@@ -47,12 +91,12 @@ const state = computed(() => props.issueState || 'N')
 // 按鈕啟用規則（可依你業務調整）
 const canNewBtn        = computed(() => canCreatePerm.value)
 const canSearchBtn     = computed(() => canReadPerm.value)
-const canCopyBtn       = computed(() => canCreatePerm.value && !props.isNew)
+const canCopy       = computed(() => canCreatePerm.value && !props.isNew)
 
-const canDeleteBtn     = computed(() => canDeletePerm.value  && !props.isNew && state.value === 'N')
-const canApproveBtn    = computed(() => canApprovePerm.value && !props.isNew && state.value === 'N')
-const canUnapproveBtn  = computed(() => canApprovePerm.value && !props.isNew && state.value === 'Y')
-const canVoidBtn       = computed(() => (isManager.value || canDeletePerm.value) && !props.isNew && state.value !== 'V')
+const canDelete     = computed(() => canDeletePerm.value  && !props.isNew && state.value === 'N')
+const canApprove    = computed(() => canApprovePerm.value && !props.isNew && state.value === 'N')
+const canUnapprove  = computed(() => canApprovePerm.value && !props.isNew && state.value === 'Y')
+const canVoid       = computed(() => (isManager.value || canDeletePerm.value) && !props.isNew && state.value !== 'V')
 
 // 若你還需要「修改/儲存」按鈕，可參考：
 // const canEditBtn = computed(() => canUpdatePerm.value && !props.isNew && state.value === 'N')

@@ -4,14 +4,13 @@
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd backend && npm run dev",
-    "client": "cd frontend && npm run dev"
+    "client": "cd frontend && npm run dev",
+    "check-case": "node check-case.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "devDependencies": {
-    "concurrently": "^9.2.0"
-  },
+  "devDependencies": { "concurrently": "^9.2.0" },
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

@@ -15,23 +15,23 @@
           </v-list-item>
         </template>
 
-        <v-list-item @click="goTo('/mold-type')">
+        <v-list-item @click="goTo(isLoggedIn ? '/mold-type' : '/login')">
           <v-list-item-title>{{ $t('moldTypeForm') }}</v-list-item-title>
         </v-list-item>
 
-        <v-list-item @click="goTo('/mold-category')">
+        <v-list-item @click="goTo(isLoggedIn ? '/mold-category' : '/login')">
           <v-list-item-title>{{ $t('moldCategory') }}</v-list-item-title>
         </v-list-item>
 
-        <v-list-item @click="goTo('/material')">
+        <v-list-item @click="goTo(isLoggedIn ? '/material' : '/login')">
           <v-list-item-title>{{ $t('material') }}</v-list-item-title>
         </v-list-item>
 
-        <v-list-item @click="goTo('/vendor')">
+        <v-list-item @click="goTo(isLoggedIn ? '/vendor' : '/login')">
           <v-list-item-title>{{ $t('vendor') }}</v-list-item-title>
         </v-list-item>
 
-        <v-list-item @click="goTo('/mold-basic')">
+        <v-list-item @click="goTo(isLoggedIn ? '/mold-basic' : '/login')">
           <v-list-item-title>{{ $t('moldBasic') }}</v-list-item-title>
         </v-list-item>
       </v-list-group>

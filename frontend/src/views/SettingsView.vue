@@ -13,7 +13,7 @@
           :color="item.color"
           theme="dark"
           elevation="3"
-          @click="goTo(item.route)"
+          @click="goTo(isLoggedIn ? item.route : '/login')"
         >
           <v-icon size="48" class="mb-2">{{ item.icon }}</v-icon>
           <div class="text-h6 font-weight-bold">{{ item.title }}</div>
@@ -26,7 +26,9 @@
 
 <script setup>
 import { useRouter } from 'vue-router';
+import { useAuth } from '@/composables/useAuth';
 const router = useRouter();
+const { isLoggedIn } = useAuth();
 
 const menuItems = [
   {

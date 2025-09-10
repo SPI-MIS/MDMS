@@ -14,6 +14,10 @@ app.use('/api', require('./routes/molds'))
 
 app.use('/api', require('./routes/moldC'))
 
+app.use('/api', require('./routes/material'))
+
+app.use('/api', require('./routes/vendor'))
+
 // 根路徑 (避免 404)
 app.get('/', (req, res) => {
   res.status(200).send('Backend is running!');

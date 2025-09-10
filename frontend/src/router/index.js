@@ -8,6 +8,9 @@ import StatusView from '@/views/StatusView.vue';
 import ManageView from '@/views/ManageView.vue';
 import moldTypeForm from '@/views/MoldtypeForm.vue';
 import moldCategoryForm from '@/views/MoldCategoryForm.vue';
+import moldMaterialForm from '@/views/MoldMaterialForm.vue';
+import vendorForm from '@/views/VendorForm.vue';
+import moldBasicForm from '@/views/MoldBasicForm.vue';
 
 const routes = [
   // { path: '/login', redirect: '/login' },
@@ -38,6 +41,21 @@ const routes = [
     path: '/mold-category', 
     component: moldCategoryForm,
     meta: { title: 'moldCategory' }
+  },
+  { 
+    path: '/material', 
+    component: moldMaterialForm,
+    meta: { title: 'material' }
+  },
+  { 
+    path: '/vendor', 
+    component: vendorForm,
+    meta: { title: 'vendor' }
+  },
+  { 
+    path: '/mold-basic', 
+    component: moldBasicForm,
+    meta: { title: 'moldBasic' }
   },
   {
     path: '/status',
