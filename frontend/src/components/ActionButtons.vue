@@ -37,7 +37,7 @@
         <span v-bind="props">
           <v-btn class="mx-1" icon="mdi-tag-check-outline" density="comfortable" color="success" :disabled="!canApprove" @click="$emit('approve')" />
         </span>
-        </template>
+      </template>
     </v-tooltip>
 
     <v-tooltip text="取消核准">
@@ -53,7 +53,7 @@
         <span>
           <v-btn v-bind="props" class="mx-1" icon="mdi-tag-off-outline" density="comfortable" color="brown" v-ripple="{ class: 'text-red' }" :disabled="!canVoid" @click="$emit('void')" />
         </span>
-        </template>
+      </template>
     </v-tooltip>
   </v-card-text>
 </template>
@@ -79,25 +79,30 @@ const props = defineProps({
 console.log('props:', props);
 defineEmits(['new','search','delete','copy','approve','unapprove','void'])
 
+// ① 加：由父層帶進來的核準狀態（沒值預設 N）
+const state = computed(() => (props.issueState || 'N').toUpperCase())
+
+// ② 加：把「狀態鎖」集中定義（可依規則調整）
+const stateAllow = computed(() => ({
+  approve:  state.value === 'N',
+  unapprove:state.value === 'Y',
+  void:     state.value !== 'V',
+}))
+
 const isManager       = computed(() => String(manager.value) === '1')
 const canCreatePerm   = computed(() => isManager.value || !!perms.value.C)
 const canReadPerm     = computed(() => isManager.value || !!perms.value.R)
-// const canUpdatePerm   = computed(() => isManager.value || !!perms.value.U)
+//const canUpdatePerm   = computed(() => isManager.value || !!perms.value.U)
 const canDeletePerm   = computed(() => isManager.value || !!perms.value.D)
 const canApprovePerm  = computed(() => isManager.value || !!perms.value.A)
-
-const state = computed(() => props.issueState || 'N')
 
 // 按鈕啟用規則（可依你業務調整）
 const canNewBtn        = computed(() => canCreatePerm.value)
 const canSearchBtn     = computed(() => canReadPerm.value)
 const canCopy       = computed(() => canCreatePerm.value && !props.isNew)
-
-const canDelete     = computed(() => canDeletePerm.value  && !props.isNew && state.value === 'N')
-const canApprove    = computed(() => canApprovePerm.value && !props.isNew && state.value === 'N')
-const canUnapprove  = computed(() => canApprovePerm.value && !props.isNew && state.value === 'Y')
-const canVoid       = computed(() => (isManager.value || canDeletePerm.value) && !props.isNew && state.value !== 'V')
-
-// 若你還需要「修改/儲存」按鈕，可參考：
-// const canEditBtn = computed(() => canUpdatePerm.value && !props.isNew && state.value === 'N')
+const canDelete     = computed(() => canDeletePerm.value  && !props.isNew)
+const canApprove    = computed(() => canApprovePerm.value && !props.isNew && stateAllow.value.approve)
+const canUnapprove  = computed(() => canApprovePerm.value && !props.isNew && stateAllow.value.unapprove)
+const canVoid       = computed(() => isManager.value && !props.isNew && stateAllow.value.void)
+//const canEditBtn = computed(() => canUpdatePerm.value && !props.isNew && state.value === 'N')
 </script>

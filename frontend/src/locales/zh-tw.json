@@ -14,6 +14,9 @@
   "moldBasic":"模具基本資料管理",
     
   "status":"模具進出管理",
+  "moldstatus":"模具狀態資料",
+  "moldfix":"模具維修資料",
+  
   "profile":"模具履歷管理",
   "manage":"系統管理頁面"
 }

@@ -1,25 +1,53 @@
-<script setup>
-import CrudPage from '@/components/CrudPage.vue'
-import axios from 'axios'
-
-const materialSchema = [
-  { key:'MB001', label:'材質代碼', type:'text', pk:true, readonly:({isNew})=>!isNew },
-  { key:'MB003', label:'說明',     type:'textarea', col:12 },
-  { key:'MB002', label:'模具類別', type:'select',
-    options: async () => {
-      const { data } = await axios.get('/api/molds', { params:{ state:'Y' }})
-      return data.map(r => ({ title:r.MA001, value:r.MA001 }))
-    }
-  },
-  { key:'MB004', label:'供應商', type:'select',
-    options: async () => {
-      const { data } = await axios.get('/api/vendors', { params:{ state:'Y' }})
-      return data.map(r => ({ title:r.VA002, value:r.VA001 }))
-    }
-  }
-]
-</script>
-
 <template>
-  <CrudPage title="模具材質維護" resource="materials" :fields="materialSchema" />
+  <v-container class="fill-height">
+    <v-row align="center" justify="center" class="text-center">
+      <v-col
+        v-for="(item, index) in menuItems"
+        :key="index"
+        cols="12"
+        sm="6"
+        md="4"
+      >
+        <v-card
+          class="pa-4 text-center"
+          :color="item.color"
+          theme="dark"
+          elevation="3"
+          @click="goTo(isLoggedIn ? item.route : '/login')"
+        >
+          <v-icon size="48" class="mb-2">{{ item.icon }}</v-icon>
+          <div class="text-h6 font-weight-bold">{{ item.title }}</div>
+          <div class="text-caption">{{ item.desc }}</div>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
+
+<script setup>
+import { useRouter } from 'vue-router';
+import { useAuth } from '@/composables/useAuth';
+const router = useRouter();
+const { isLoggedIn } = useAuth();
+
+const menuItems = [
+  {
+    title: '生產履歷',
+    desc: '查看模具生產履歷',
+    icon: 'mdi-file-account',
+    color: 'indigo',
+    route: '/mold-resume'
+  },
+  {
+    title: '模具壽命',
+    desc: '管理模具壽命資料',
+    icon: 'mdi-battery-medium',
+    color: 'deep-purple',
+    route: '/mold-lifespan'
+  }
+];
+
+const goTo = (path) => {
+  router.push(path);
+};
+</script>

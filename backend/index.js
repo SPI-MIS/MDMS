@@ -18,6 +18,10 @@ app.use('/api', require('./routes/material'))
 
 app.use('/api', require('./routes/vendor'))
 
+app.use('/api', require('./routes/moldbasic'))
+
+app.use('/api', require('./routes/spi'))
+
 // 根路徑 (避免 404)
 app.get('/', (req, res) => {
   res.status(200).send('Backend is running!');
@@ -32,3 +36,5 @@ app.get('/health', (req, res) => {
 app.listen(3000, () => {
   console.log('✅ Backend running on http://localhost:3000')
 })
+
+// module.exports = router; 

@@ -65,13 +65,13 @@ router.post('/vendor', async (req, res) => {
     console.log('參數:', {
       MD001: MD001.trim(),
       MD002: MD002 || '',
-      MD002: MD003 || '',
-      MD002: MD004 || '',
-      MD002: MD005 || '',
-      MD002: MD006 || '',
-      MD002: MD007 || '',
-      MD002: MD008 || '',
-      MD002: MD009 || '',
+      MD003: MD003 || '',
+      MD004: MD004 || '',
+      MD005: MD005 || '',
+      MD006: MD006 || '',
+      MD007: MD007 || '',
+      MD008: MD008 || '',
+      MD009: MD009 || '',
       Creator: Creator || 'SYSTEM'
     });
     
@@ -230,13 +230,13 @@ router.post('/vendor/:id/copy', async (req, res) => {
     await pool.request()
       .input('MD001', sql.NVarChar, newId)
       .input('MD002', sql.NVarChar, r.MD002)
-      .input('MD002', sql.NVarChar, r.MD003)
-      .input('MD002', sql.NVarChar, r.MD004)
-      .input('MD002', sql.NVarChar, r.MD005)
-      .input('MD002', sql.NVarChar, r.MD006)
-      .input('MD002', sql.NVarChar, r.MD007)
-      .input('MD002', sql.NVarChar, r.MD008)
-      .input('MD002', sql.NVarChar, r.MD009)
+      .input('MD006', sql.NVarChar, r.MD003)
+      .input('MD004', sql.NVarChar, r.MD004)
+      .input('MD005', sql.NVarChar, r.MD005)
+      .input('MD006', sql.NVarChar, r.MD006)
+      .input('MD007', sql.NVarChar, r.MD007)
+      .input('MD008', sql.NVarChar, r.MD008)
+      .input('MD009', sql.NVarChar, r.MD009)
       .input('Creator', sql.NVarChar, r.Creator)
       .query(`
         INSERT INTO dbo.SMSMD(MD001, MD002,MD003, MD004, MD005, MD006, MD007, MD008, MD009, IssueState, Creator, CreateDate)

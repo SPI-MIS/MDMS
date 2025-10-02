@@ -41,16 +41,16 @@
       <!-- 模具狀態管理（階層） -->
       <v-list-group prepend-icon="mdi-state-machine">
         <template #activator="{ props }">
-          <v-list-item v-bind="props" @click="goTo('/status')">
+          <v-list-item v-bind="props" @click="goTo(isLoggedIn ? '/status' : '/login')">
             <v-list-item-title>{{ $t('status') }}</v-list-item-title>
           </v-list-item>
         </template>
 
-        <v-list-item @click="goTo('/mold-type')">
+        <v-list-item @click="goTo(isLoggedIn ? '/mold-status' : '/login')">
           <v-list-item-title>模具狀態</v-list-item-title>
         </v-list-item>
 
-        <v-list-item @click="goTo('/mold-category')">
+        <v-list-item @click="goTo(isLoggedIn ? '/mold-fix' : '/login')">
           <v-list-item-title>模具維修</v-list-item-title>
         </v-list-item>
       </v-list-group>
@@ -60,16 +60,16 @@
       <!-- 模具履歷管理（階層） -->
       <v-list-group prepend-icon="mdi-file-account">
         <template #activator="{ props }">
-          <v-list-item v-bind="props" @click="goTo('/profile')">
+          <v-list-item v-bind="props" @click="goTo(isLoggedIn ? '/profile' : '/login')">
             <v-list-item-title>{{ $t('profile') }}</v-list-item-title>
           </v-list-item>
         </template>
 
-        <v-list-item @click="goTo('/mold-type')">
+        <v-list-item @click="goTo(isLoggedIn ? '/mold-type' : '/login')">
           <v-list-item-title>生產履歷</v-list-item-title>
         </v-list-item>
 
-        <v-list-item @click="goTo('/mold-category')">
+        <v-list-item @click="goTo(isLoggedIn ? '/mold-category' : '/login')">
           <v-list-item-title>模具壽命</v-list-item-title>
         </v-list-item>
       </v-list-group>
@@ -169,7 +169,7 @@
       <v-list-item v-else @click="goTo('/login')" title="登入" />
       <v-divider class="my-1" />
       <!-- 語系：手機用簡單清單 -->
-      <v-subheader>Language</v-subheader>
+      <v-list-subheader>Language</v-list-subheader>
       <v-list-item v-for="l in languages" :key="l.key" @click="lang = l; changeLang()" >
         <div class="d-flex align-center" style="gap:8px;">
           <v-img :src="l.image" width="28" aspect-ratio="1.6" class="rounded-sm" cover />

@@ -21,17 +21,22 @@
       <!-- 表單（依 schema 渲染） -->
       <v-card-text>
         <v-row class="g-2">
-          <template v-for="f in fields" :key="f.key">
+          <template v-for="f in renderFields" :key="f.key">
             <v-col :cols="12" :md="f.col ?? 6">
               <component
                 :is="componentMap[f.type || 'text']"
                 v-model="models[f.key]"
                 :label="f.label"
                 v-bind="f.props"
+                :rules="fieldUiRules(f)" 
                 :readonly="resolveReadonly(f)"
                 :items="optionsMap[f.key]"
                 :item-title="f.itemTitle || 'title'"
                 :item-value="f.itemValue || 'value'"
+                :type="f.type === 'date' ? 'date' : undefined"
+                :hint="fieldHints[f.key] || f.props?.hint"
+                :persistent-hint="!!(fieldHints[f.key] || f.props?.['persistent-hint'])"
+                @blur="onLookupBlur(f.key)"
               />
             </v-col>
           </template>
@@ -69,7 +74,7 @@
             </v-col>
           </v-row>
 
-          <v-data-table :headers="listHeaders" :items="resultList" height="320" fixed-header>
+          <v-data-table :headers="listHeaders" :items="resultList" height="260" fixed-header>
             <template v-slot:[`item.pick`]="{ item }">
               <v-btn size="small" @click="pick(item)">選取</v-btn>
             </template>
@@ -86,10 +91,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import axios from 'axios'
 import ActionButtons from '@/components/ActionButtons.vue'
 import { useAuth } from '@/composables/useAuth'
+
+const fieldHints = reactive({})
 
 // ── 由各頁傳入的差異化參數 ─────────────────────────
 const props = defineProps({
@@ -101,12 +108,22 @@ const props = defineProps({
   ])}
 })
 
-// 基本狀態
+/* ---------------- 小工具 ---------------- */
+function debounce (fn, ms = 300) { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms) } }
+const getByPath = (o, path) => path.split('.').reduce((x,k)=> (x?.[k]), o)
+function today() {
+  const d = new Date()
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}` // YYYY-MM-DD（本地）
+}
+
+/* ---------------- 基本狀態 ---------------- */
 const { userId, userName } = useAuth()
 const form = reactive({
   IssueState: 'N',
   Creator: userId.value || userName.value || 'SYSTEM',
   CreateDate: new Date().toISOString(),
+  categoryIds: [],
 })
 const isNew = ref(true)
 const searchDialog = ref(false)
@@ -132,7 +149,9 @@ const componentMap = {
   text: 'v-text-field',
   textarea: 'v-textarea',
   select: 'v-select',
-  checkbox: 'v-checkbox'
+  checkbox: 'v-checkbox',
+  combobox:'v-combobox',
+  date: 'v-text-field'
 }
 
 // optionsMap：給 select 用的 items（支援 async loader）
@@ -151,36 +170,201 @@ async function initOptions() {
   }
 }
 
+// 可見性：支援 visible（布林或函式）、hideOnCreate、hideOnEdit
+function resolveVisible(f) {
+  if (typeof f.visible === 'function') return f.visible({ isNew: isNew.value, form })
+  if (typeof f.visible === 'boolean')  return f.visible
+  if (f.hideOnCreate && isNew.value)   return false
+  if (f.hideOnEdit && !isNew.value)    return false
+  return true
+}
+
+// 只渲染可見欄位
+const renderFields = computed(() => props.fields.filter(resolveVisible))
+
+// —— 驗證工具 —— //
+function isBlank(v) {
+  return v === undefined || v === null || (typeof v === 'string' && v.trim() === '')
+}
+
+// UI 規則：把 schema 的 props.rules 與必填規則合併；被隱藏就不附加規則
+function fieldUiRules(f) {
+  const base = (f.props?.rules || []).slice()
+  if (!resolveVisible(f)) return base
+  const required = (typeof f.required === 'function') ? f.required(form) : !!f.required
+  if (required) {
+    base.unshift(v => !isBlank(v) || (f.requiredMsg || `${f.label || f.key} 不能為空`))
+  }
+  return base
+}
+
+// 送出前的 schema 驅動驗證：自動跳過目前不顯示的欄位
+function validateBeforeSave() {
+  const errors = []
+  for (const f of props.fields) {
+    if (!resolveVisible(f)) continue
+
+    const required = (typeof f.required === 'function') ? f.required(form) : !!f.required
+    if (required && isBlank(form[f.key])) {
+      errors.push(f.requiredMsg || `${f.label || f.key} 不能為空`)
+      continue
+    }
+    if (typeof f.validate === 'function') {
+      const r = f.validate(form[f.key], form)
+      if (r !== true) errors.push(typeof r === 'string' ? r : `${f.label || f.key} 格式不正確`)
+    }
+  }
+  return errors
+}
+
 // models：為了支援 Y/N ↔ boolean 等轉換
 const models = reactive({})
 function bindModels() {
+  // 先確保 form 有對應欄位（避免 v-model 綁不到）
   props.fields.forEach(f => {
-    // 建立預設欄位
-    if (form[f.key] === undefined) form[f.key] = f.default ?? (f.type==='checkbox' ? 'N' : '')
+    const baseDefault =
+    f.type === 'date'     ? today() :
+    f.type === 'checkbox' ? 'N'     : ''
+    form[f.key] = (typeof f.default === 'function')
+    ? f.default()
+    : (f.default !== undefined ? f.default : baseDefault)
+  })
 
-    // 代理：有 transform 就用 get/set，否則直綁
-    Object.defineProperty(models, f.key, {
-      get() {
-        const v = form[f.key]
-        if (f.transform?.get) return f.transform.get(v, form)
-        return v
-      },
-      set(val) {
-        if (f.transform?.set) form[f.key] = f.transform.set(val, form)
-        else form[f.key] = val
-      }
-    })
+  // 針對每個欄位建立一個 computed ref 代理 transform
+  props.fields.forEach(f => {
+    if (!models[f.key]) {
+      models[f.key] = computed({
+        get() {
+          const v = form[f.key]
+          return f.transform?.get ? f.transform.get(v, form) : v
+        },
+        set(val) {
+          form[f.key] = f.transform?.set ? f.transform.set(val, form) : val
+        },
+      })
+    }
   })
 }
 const resolveReadonly = (f) => typeof f.readonly === 'function' ? f.readonly({ isNew: isNew.value, form }) : !!f.readonly
 
+// 存每個欄位的 lookup 設定與執行器
+const lookupConfigs  = {}   // key -> f.lookup
+const lookupFetchers = {}   // key -> doFetch 函數
+
+function onLookupBlur(key) {
+  const lk = lookupConfigs[key]
+  if (!lk || lk.trigger !== 'blur') return        // 只有 blur 型才處理
+  const v = form[key]
+  if (!v || !String(v).trim()) return resetTargetsFor(key)
+  lookupFetchers[key]?.(v)
+}
+
+function resetTargetsFor(key) {
+  const lk = lookupConfigs[key]
+  if (!lk) return
+  if (lk.target) form[lk.target] = ''
+  if (lk.targetMap) for (const k of Object.keys(lk.targetMap)) form[k] = ''
+  fieldHints[key] = ''                   // ← 清空提示
+}
+
+function setupLookups () {
+  props.fields.forEach(f => {
+    if (!f.lookup) return
+    const lk = f.lookup
+    lookupConfigs[f.key] = lk
+
+    const src = () => form[f.key]
+    const resetTargets = () => resetTargetsFor(f.key)
+    const doFetch = debounce(async (val) => {
+      const code = (val ?? '').toString().trim()
+      if (!code) { resetTargets(); return }
+      try {
+        const method = (lk.method || 'get').toLowerCase()
+        let url = typeof lk.url === 'function' ? lk.url(code, form) : lk.url
+        if (typeof url === 'string' && url.includes(':id')) {
+          url = url.replace(':id', encodeURIComponent(code))
+        }
+        const params = typeof lk.params === 'function' ? lk.params(code, form) : (lk.params || {})
+
+        const resp = method === 'post'
+          ? await axios.post(url, params)
+          : await axios.get(url, { params })
+
+        const raw = Array.isArray(resp.data) ? resp.data[0] : resp.data
+        if (!raw) { resetTargets(); return }
+
+        if (lk.target) {
+          const v = typeof lk.pick === 'function'
+            ? lk.pick(raw, form)
+            : typeof lk.pick === 'string'
+              ? getByPath(raw, lk.pick)
+              : raw
+          form[lk.target] = (v ?? '').toString()
+        }
+        if (lk.targetMap) {
+          for (const [dst, srcPathOrFn] of Object.entries(lk.targetMap)) {
+            const v = typeof srcPathOrFn === 'function'
+              ? srcPathOrFn(raw, form)
+              : getByPath(raw, srcPathOrFn)
+            form[dst] = (v ?? '').toString()
+          }
+        }
+        // ----- 動態 hint：若有設定 hintPick / hintPrefix 就顯示在同欄位提示 -----
+        if (lk.hintPick) {
+          const hv = typeof lk.hintPick === 'function'
+            ? lk.hintPick(raw, form)
+            : lk.hintPick.split('.').reduce((o,k)=>o?.[k], raw)
+          const text = hv ?? ''
+          fieldHints[f.key] = lk.hintPrefix ? `${lk.hintPrefix}${text}` : String(text)
+        }
+      } catch (err) {
+        resetTargets()
+        throw err;
+      }
+    }, lk.debounce ?? 300)
+
+    // 存起來給 onLookupBlur 用
+    lookupFetchers[f.key] = doFetch
+
+    // input 型：即時監看
+    if (lk.trigger !== 'blur') {
+      watch(src, (v) => {
+        if (lk.when && !lk.when(v, form)) return
+        if (!v || !String(v).trim()) return resetTargets()
+        doFetch(v)
+      })
+    }
+
+    // immediate：初始化或載入單筆後也先跑一次
+    if (lk.immediate) {
+      const cur = src()
+      if (cur && String(cur).trim()) doFetch(cur)
+    }
+  })
+}
+
 onMounted(async () => {
   bindModels()
   await initOptions()
+  setupLookups()
 })
 
 // ── CRUD 動作（用 resource 組 RESTful 路徑） ─────────
 const apiBase = computed(() => `/api/${props.resource}`)
+
+function buildPayload () {
+  const payload = {}
+  // 只收集需儲存的欄位（noSave:true 的跳過）
+  for (const f of props.fields) {
+    if (f.noSave) continue
+    payload[f.key] = form[f.key]
+  }
+  // 固定欄位
+  payload.IssueState = form.IssueState
+  payload.Creator    = form.Creator
+  payload.CreateDate = form.CreateDate
+  return payload
+}
 
 function onNew() {
   Object.keys(form).forEach(k => delete form[k])
@@ -188,22 +372,29 @@ function onNew() {
   form.Creator = userId.value || userName.value || 'SYSTEM'
   form.CreateDate = new Date().toISOString()
   // 依 schema 補預設
-  props.fields.forEach(f => (form[f.key] = f.default ?? (f.type==='checkbox' ? 'N' : '')))
+  props.fields.forEach(f => {
+    const baseDefault =
+    f.type === 'date'     ? today() :
+    f.type === 'checkbox' ? 'N'     : ''
+    form[f.key] = (typeof f.default === 'function')
+      ? f.default()
+      : (f.default !== undefined ? f.default : baseDefault)
+  })
   isNew.value = true
 }
 
 async function onSave() {
+   // 1) schema 驅動驗證（自動跳過隱藏欄位）
+  const errs = validateBeforeSave()
+  if (errs.length) { alert(errs.join('\n')); return }
   // 取主鍵（假設第一個欄位為主鍵，或你可在 schema 指定 f.pk=true）
   const pkField = props.fields.find(f => f.pk) || props.fields[0]
   const id = form[pkField.key]
   if (!id || !String(id).trim()) return alert(`${pkField.label} 不能為空`)
 
-  if (isNew.value) {
-    await axios.post(apiBase.value, form)
-    isNew.value = false
-  } else {
-    await axios.put(`${apiBase.value}/${id}`, form)
-  }
+  const payload = buildPayload()
+  if (isNew.value) await axios.post(apiBase.value, payload)
+  else await axios.put(`${apiBase.value}/${id}`, payload)
   await loadOne(id)
   alert('儲存成功')
 }
