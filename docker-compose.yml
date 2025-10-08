@@ -9,20 +9,26 @@ services:
       - "3000"
     environment:
       - NODE_ENV=production
-    networks:
-      - webnet
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]  # 寫你後端健康檢查路徑
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [webnet]
 
   frontend:
     build:
       context: ./frontend
     container_name: website_frontend
     ports:
-      - "8180:80"   # 對外 8180，Nginx 裡是 8080
+      - "8180:80"
     depends_on:
-      - backend
-    networks:
-      - webnet
+      backend:
+        condition: service_healthy    # ★ 等後端健康
+    networks: [webnet]
+
 
 networks:
   webnet:
     driver: bridge
+
