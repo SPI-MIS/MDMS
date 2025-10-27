@@ -2,15 +2,21 @@
   <v-app>
     <v-layout>
       <HeaderBar :user-id="userId" :user-name="userName" :manager="manager" />
-      <v-main>          <!-- 內容會自動避開上方 App Bar -->
+
+      <v-main>
+        <!-- 內容區 -->
         <router-view @login-success="updateUser" />
       </v-main>
-    </v-layout>    
+
+      <Footer />
+    </v-layout>
   </v-app>
 </template>
 
+
 <script setup>
 import HeaderBar from '@/components/HeaderBar.vue'
+import Footer from '@/components/FooterPage.vue'
 import { ref, onMounted } from 'vue'
 
 const userId = ref('')
