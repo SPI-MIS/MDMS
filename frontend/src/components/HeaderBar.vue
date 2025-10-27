@@ -75,6 +75,10 @@
       </v-list-group>
 
       <v-divider />
+      <!-- 小工具（首頁） -->
+      <v-list-item @click="goTo('/tool_excelimport')">
+        <v-list-item-title>{{ $t('excelimport') }}</v-list-item-title>
+      </v-list-item>
 
       <!-- 系統管理 -->
       <v-list-item v-if="String(manager) === '1'" @click="goTo('/manage')">
@@ -125,6 +129,7 @@
           <v-list-item v-if="String(manager) === '1'" @click="goTo('/manage')">
             <v-list-item-title>{{ $t('manage') }}</v-list-item-title>
           </v-list-item>
+         
           <v-list-item @click="logout">
             <v-list-item-title>{{ $t('logout') }}</v-list-item-title>
           </v-list-item>

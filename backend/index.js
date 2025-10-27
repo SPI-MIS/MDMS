@@ -22,6 +22,8 @@ app.use('/api', require('./routes/moldbasic'))
 
 app.use('/api', require('./routes/spi'))
 
+app.use('/api', require('./routes/tool'))
+
 // 根路徑 (避免 404)
 app.get('/', (req, res) => {
   res.status(200).send('Backend is running!');

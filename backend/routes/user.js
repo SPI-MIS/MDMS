@@ -52,7 +52,7 @@ router.get('/user/:id', async (req, res) => {
 // 新增
 router.post('/user', async (req, res) => {
   const {
-    SA001, SA002 = '', SA003 = 'user', SA004 = 'N', SA005, SA006, SA007 = 'N',
+    SA001, SA002 = '', SA003 = 'user', SA004 = '', SA005, SA006, SA007 = 'N',
     SA008 = 'N', SA009 = 'Y', SA0010 = 'N', SA0011 = 'N', SA0012 = 'N', SA0013 = 'N',
     Creator = 'SYSTEM'
   } = req.body;
@@ -66,7 +66,7 @@ router.post('/user', async (req, res) => {
     r.input('SA001', sql.NVarChar, SA001.trim());
     r.input('SA002', sql.NVarChar, SA002);
     r.input('SA003', sql.NVarChar, SA003);
-    r.input('SA004', sql.NVarChar, SA004 === 'Y' ? 'Y' : 'N');
+    r.input('SA004', sql.NVarChar, SA004);
     r.input('SA005', sql.NVarChar, SA005);
     r.input('SA006', sql.NVarChar, SA006);
     // 若是管理者，權限全 Y；否則採用傳入值（預設 R=Y 其餘 N）
@@ -110,7 +110,7 @@ router.post('/user', async (req, res) => {
 router.put('/user/:id', async (req, res) => {
   const id = req.params.id?.trim();
   if (!id) return res.status(400).json({ error: 'ID is required' });
-  const { SA002 = '', SA003 = 'user', SA004 = 'N' } = req.body;
+  const { SA002 = '', SA003 = '', SA004 = 'user' } = req.body;
 
   try {
     const pool = await getPool();
@@ -124,7 +124,7 @@ router.put('/user/:id', async (req, res) => {
     const r = pool.request();
     r.input('SA002', sql.NVarChar, SA002);
     r.input('SA003', sql.NVarChar, SA003);
-    r.input('SA004', sql.NVarChar, SA004 === 'Y' ? 'Y' : 'N');
+    r.input('SA004', sql.NVarChar, SA004);
     r.input('id', sql.NVarChar, id);
 
     const result = await r.query(`

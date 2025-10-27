@@ -18,6 +18,7 @@
         <v-btn block height="120" color="info" class="text-h5 font-weight-bold" @click="goTo('profile')" > 
           <div style="white-space: normal; line-height: 1.2;">{{ $t('profile') }}</div></v-btn>
       </v-col>
+      
     </v-row>
   </v-container>
 </template>

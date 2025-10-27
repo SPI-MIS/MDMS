@@ -11,6 +11,7 @@ import moldCategoryForm from '@/views/MoldCategoryForm.vue';
 import moldMaterialForm from '@/views/MoldMaterialForm.vue';
 import vendorForm from '@/views/VendorForm.vue';
 import moldBasicForm from '@/views/MoldBasicForm.vue';
+import toolexcel from '@/views/ExcelImport.vue';
 
 const routes = [
   // { path: '/login', redirect: '/login' },
@@ -73,6 +74,11 @@ const routes = [
     path: '/login', 
     component: LoginView,
     meta: { title: 'system' }
+  },
+  { 
+    path: '/tool_excelimport', 
+    component: toolexcel,
+    meta: { title: 'excelimport' }
   }
 ]
 

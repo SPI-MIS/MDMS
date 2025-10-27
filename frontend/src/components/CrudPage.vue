@@ -83,7 +83,7 @@
         <v-card-actions>
           <v-spacer />
           <v-btn @click="doSearch">查詢</v-btn>
-          <v-btn text @click="searchDialog = false">關閉</v-btn>
+          <v-btn text @click="closeSearchDialog">關閉</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -132,6 +132,7 @@ const qState = ref('')
 const resultList = ref([])
 
 const stateItems = [
+  { title: '全部', value: '' },
   { title: 'N：未確認', value: 'N' },
   { title: 'Y：已確認', value: 'Y' },
   { title: 'V：作廢',   value: 'V' }
@@ -343,6 +344,15 @@ function setupLookups () {
   })
 }
 
+watch(searchDialog, (val) => {
+  if (!val) {
+    q.value = ''
+    qState.value = ''
+    resultList.value = []
+  }
+})
+
+
 onMounted(async () => {
   bindModels()
   await initOptions()
@@ -438,6 +448,15 @@ async function doSearch() {
   const { data } = await axios.get(apiBase.value, { params: { q: q.value, state: qState.value } })
   resultList.value = data
 }
+
+function closeSearchDialog() {
+  searchDialog.value = false
+  q.value = ''
+  qState.value = ''
+  resultList.value = []
+}
+
+
 function pick(item) {
   searchDialog.value = false
   isNew.value = false
