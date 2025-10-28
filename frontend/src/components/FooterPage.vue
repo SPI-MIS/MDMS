@@ -1,10 +1,20 @@
 <template>
-  <v-footer app height="36" class="justify-center text-caption py-1 px-3" color="primary" >
-    <div class="py-4 px-2">
-      <span class="font-weight-light">&copy; {{ new Date().getFullYear() }} 南化 SPI 系統(25.10.27)</span>
-    </div>
+  <v-footer app height="36" class="py-1 px-3" color="Second">
+    <v-container fluid>
+      <v-row align="center" justify="space-between" class="text-caption">
+        <!-- 左 -->
+        <v-col cols="4" class="text-left py-0">版本 v1.0.0</v-col>
+
+        <!-- 中 -->
+        <v-col cols="4" class="text-center py-0"> &copy; {{ new Date().getFullYear() }} 南化模具管理系統 </v-col>
+
+        <!-- 右 -->
+        <v-col cols="4" class="text-right py-0">聯絡我們</v-col>
+      </v-row>
+    </v-container>
   </v-footer>
 </template>
+
 
 <script setup>
 // 無需 script 區塊，因為使用簡單顯示內容。
