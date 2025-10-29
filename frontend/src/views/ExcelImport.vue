@@ -1,34 +1,35 @@
 <template>
-  <div class="p-4">
-    <h2>📥 Excel 資料匯入</h2>
-    
+  <div class="mt-3 ml-3" >    
+    <h2>📥 Excel 資料匯入</h2>    
     <!-- 檔案上傳 -->
     <input type="file" accept=".xlsx,.xls" @change="handleFile" />
     <p v-if="message" class="text-red-500 mt-2">{{ message }}</p>
     <!-- 預覽 -->
-    <div v-if="previewData">
-      <h3 class="mt-4">🔄 預覽結果：</h3>
+    <v-card class="ma-3" >
+      <div v-if="previewData">
+        <h3 class="mt-2">🔄 預覽結果：</h3>
 
-      <div v-if="previewData.updates.length">
-        <h4 class="mt-2">✏️ 將更新資料：</h4>
-        <v-data-table :headers="headers" :items="previewData.updates" dense hide-default-footer />
+        <div v-if="previewData.updates.length">
+          <h4 class="mt-2 ml-3">✏️ 將更新資料：</h4>
+          <v-data-table class="ma-3" :headers="headers" :items="previewData.updates" density="compact" hide-default-footer />
+        </div>
+
+        <div v-if="previewData.inserts.length">
+          <h4 class="mt-2 ml-3">➕ 將新增資料：</h4>
+          <v-data-table class="ma-3" :headers="headers" :items="previewData.inserts" density="compact" hide-default-footer />
+        </div>
+
+        <!-- ✅ 如果無更新也無新增資料，顯示提示文字 -->
+        <div v-if="!previewData.updates.length && !previewData.inserts.length" class="mt-4 text-grey">
+          ⚠️ 沒有可更新資料
+        </div>
+
+        <!-- ✅ 匯入按鈕僅在有資料時顯示 -->
+        <v-btn v-if="previewData.updates.length || previewData.inserts.length" color="primary" class="ma-3" @click="handleImport" >
+          ✅ 確定匯入
+        </v-btn>
       </div>
-
-      <div v-if="previewData.inserts.length">
-        <h4 class="mt-4">➕ 將新增資料：</h4>
-        <v-data-table :headers="headers" :items="previewData.inserts" dense hide-default-footer />
-      </div>
-
-      <!-- ✅ 如果無更新也無新增資料，顯示提示文字 -->
-      <div v-if="!previewData.updates.length && !previewData.inserts.length" class="mt-4 text-grey">
-        ⚠️ 沒有可更新資料
-      </div>
-
-      <!-- ✅ 匯入按鈕僅在有資料時顯示 -->
-      <v-btn v-if="previewData.updates.length || previewData.inserts.length" color="primary" class="mt-4" @click="handleImport" >
-        ✅ 確定匯入
-      </v-btn>
-    </div>
+    </v-card>
   </div>
 </template>
 
