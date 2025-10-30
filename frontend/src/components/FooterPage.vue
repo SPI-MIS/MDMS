@@ -9,7 +9,7 @@
         <v-col cols="4" class="text-center py-0"> &copy; {{ new Date().getFullYear() }} 南化模具管理系統 </v-col>
 
         <!-- 右 -->
-        <v-col cols="4" class="text-right py-0">版本 v1.0.0</v-col>
+        <v-col cols="4" class="text-right py-0">版本 v1.0.1</v-col>
       </v-row>
     </v-container>
   </v-footer>
