@@ -11,21 +11,24 @@ const config = {
   options: {
     encrypt: process.env.MSSQL_ENCRYPT === 'true',
     trustServerCertificate: true,
+    enableArithAbort: true
   },
   pool: {
-    max: 10,
+    max: 5,
     min: 0,
-    idleTimeoutMillis: 30000,
+    idleTimeoutMillis: 5000
   }
 }
 
-let pool // 單例
-
+// ⚠️ 不使用全域 pool，確保每次查詢都建立新 session
 async function getPool () {
-  if (pool?.connected) return pool
-  if (pool) { try { await pool.close() } catch (_) {} }
-  pool = await sql.connect(config)
-  return pool
+  try {
+    const pool = await sql.connect(config)
+    return pool
+  } catch (err) {
+    console.error('❌ SQL Connect Error:', err)
+    throw err
+  }
 }
 
 module.exports = { sql, getPool }

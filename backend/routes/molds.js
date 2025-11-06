@@ -21,6 +21,7 @@ router.get('/molds', async (req, res) => {
       ORDER BY MA001
     `);
     res.json(rs.recordset);
+    pool.close() // 👈 關閉連線池，釋放舊 session
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -38,6 +39,7 @@ router.get('/molds/:id', async (req, res) => {
       `);
     if (rs.recordset.length === 0) return res.status(404).json({ error: 'not found' });
     res.json(rs.recordset[0]);
+    pool.close() // 👈 關閉連線池，釋放舊 session
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -94,6 +96,7 @@ router.post('/molds', async (req, res) => {
         Creator: Creator || 'SYSTEM'
       }
     });
+    pool.close() // 👈 關閉連線池，釋放舊 session
     
   } catch (err) {
     console.error('=== 新增請求錯誤 ===');
@@ -171,7 +174,7 @@ router.put('/molds/:id', async (req, res) => {
     
     console.log('修改成功:', result);
     res.json({ success: true, message: '修改成功' });
-    
+    pool.close() // 👈 關閉連線池，釋放舊 session
   } catch (err) {
     console.error('修改錯誤:', err);
     res.status(500).json({ 
@@ -195,6 +198,7 @@ router.delete('/molds/:id', async (req, res) => {
     await pool.request().input('id', sql.NVarChar, req.params.id)
       .query(`DELETE FROM dbo.SMSMA WHERE MA001=@id`);
     res.json({ success: true });
+    pool.close() // 👈 關閉連線池，釋放舊 session
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -220,6 +224,7 @@ router.post('/molds/:id/copy', async (req, res) => {
         VALUES(@MA001, @MA002, @MA003, 'N', @Creator, GETDATE())
       `);
     res.json({ success: true, newId });
+    pool.close() // 👈 關閉連線池，釋放舊 session
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -237,6 +242,7 @@ router.post('/molds/:id/approve', async (req, res) => {
     await pool.request().input('id', sql.NVarChar, req.params.id)
       .query(`UPDATE dbo.SMSMA SET IssueState='Y' WHERE MA001=@id`);
     res.json({ success: true });
+    pool.close() // 👈 關閉連線池，釋放舊 session
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -254,6 +260,7 @@ router.post('/molds/:id/unapprove', async (req, res) => {
     await pool.request().input('id', sql.NVarChar, req.params.id)
       .query(`UPDATE dbo.SMSMA SET IssueState='N' WHERE MA001=@id`);
     res.json({ success: true });
+    pool.close() // 👈 關閉連線池，釋放舊 session
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -271,6 +278,7 @@ router.post('/molds/:id/void', async (req, res) => {
     await pool.request().input('id', sql.NVarChar, req.params.id)
       .query(`UPDATE dbo.SMSMA SET IssueState='V' WHERE MA001=@id`);
     res.json({ success: true });
+    pool.close() // 👈 關閉連線池，釋放舊 session
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

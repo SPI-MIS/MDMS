@@ -4,11 +4,11 @@ services:
       context: ./backend
     container_name: website_backend
     expose:
-      - "3000"
+      - "4000"
     environment:
       - NODE_ENV=production
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]  # 寫你後端健康檢查路徑
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:4000/health"]  # 寫你後端健康檢查路徑
       interval: 10s
       timeout: 5s
       retries: 5
