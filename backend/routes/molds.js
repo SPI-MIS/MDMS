@@ -162,7 +162,7 @@ router.put('/molds/:id', async (req, res) => {
     console.log('目前狀態:', state);
     
     if (state === 'Y' || state === 'V') {
-      return res.status(400).json({ error: '已核准或作廢的記錄不可修改' });
+      return res.json({ success: false, message: '已核准或作廢的記錄不可修改'});
     }
 
     // 執行更新
@@ -193,10 +193,9 @@ router.delete('/molds/:id', async (req, res) => {
       .query(`SELECT IssueState FROM dbo.SMSMA WHERE MA001=@id`);
     if (rs.recordset.length === 0) return res.status(404).json({ error: 'not found' });
     const state = rs.recordset[0].IssueState;
-    if (state !== 'N') return res.status(400).json({ error: 'only N can delete' });
+    if (state !== 'N') {return res.json({ success: false, message: '已核准或作廢的記錄不可修改'});}
 
-    await pool.request().input('id', sql.NVarChar, req.params.id)
-      .query(`DELETE FROM dbo.SMSMA WHERE MA001=@id`);
+    await pool.request().input('id', sql.NVarChar, req.params.id).query(`DELETE FROM dbo.SMSMA WHERE MA001=@id`);
     res.json({ success: true });
     pool.close() // 👈 關閉連線池，釋放舊 session
   } catch (err) {

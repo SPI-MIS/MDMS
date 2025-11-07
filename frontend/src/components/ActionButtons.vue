@@ -16,10 +16,10 @@
         </template>
     </v-tooltip>
 
-    <v-tooltip text="刪除">
+    <v-tooltip text="修改">
       <template #activator="{ props }">
         <span v-bind="props">
-          <v-btn class="mx-1" icon="mdi-trash-can-outline" density="comfortable" color="error" :disabled="!canDelete" @click="$emit('delete')" />
+          <v-btn class="mx-1" icon="mdi-file-edit-outline" density="comfortable" :disabled="!canDelete" @click="$emit('update')" />
         </span>
         </template>
     </v-tooltip>
@@ -28,6 +28,14 @@
       <template #activator="{ props }">
         <span v-bind="props">
           <v-btn class="mx-1" icon="mdi-content-copy" density="comfortable" :disabled="!canCopy" @click="$emit('copy')" />
+        </span>
+        </template>
+    </v-tooltip>
+
+    <v-tooltip text="刪除">
+      <template #activator="{ props }">
+        <span v-bind="props">
+          <v-btn class="mx-1" icon="mdi-trash-can-outline" density="comfortable" color="error" :disabled="!canDelete" @click="$emit('delete')" />
         </span>
         </template>
     </v-tooltip>
@@ -77,7 +85,7 @@ const props = defineProps({
 })
 
 console.log('props:', props);
-defineEmits(['new','search','delete','copy','approve','unapprove','void'])
+defineEmits(['new','search','update','delete','copy','approve','unapprove','void'])
 
 // ① 加：由父層帶進來的核準狀態（沒值預設 N）
 const state = computed(() => (props.issueState || 'N').toUpperCase())
@@ -92,7 +100,7 @@ const stateAllow = computed(() => ({
 const isManager       = computed(() => String(manager.value) === '1')
 const canCreatePerm   = computed(() => isManager.value || !!perms.value.C)
 const canReadPerm     = computed(() => isManager.value || !!perms.value.R)
-//const canUpdatePerm   = computed(() => isManager.value || !!perms.value.U)
+const canUpdatePerm   = computed(() => isManager.value || !!perms.value.U)
 const canDeletePerm   = computed(() => isManager.value || !!perms.value.D)
 const canApprovePerm  = computed(() => isManager.value || !!perms.value.A)
 
@@ -100,9 +108,9 @@ const canApprovePerm  = computed(() => isManager.value || !!perms.value.A)
 const canNewBtn        = computed(() => canCreatePerm.value)
 const canSearchBtn     = computed(() => canReadPerm.value)
 const canCopy       = computed(() => canCreatePerm.value && !props.isNew)
-const canDelete     = computed(() => canDeletePerm.value  && !props.isNew)
+const canDelete     = computed(() => canDeletePerm.value  && !props.isNew && stateAllow.value.approve)
 const canApprove    = computed(() => canApprovePerm.value && !props.isNew && stateAllow.value.approve)
 const canUnapprove  = computed(() => canApprovePerm.value && !props.isNew && stateAllow.value.unapprove)
 const canVoid       = computed(() => isManager.value && !props.isNew && stateAllow.value.void)
-//const canEditBtn = computed(() => canUpdatePerm.value && !props.isNew && state.value === 'N')
+const canEditBtn = computed(() => canUpdatePerm.value && !props.isNew && state.value === 'N')
 </script>
