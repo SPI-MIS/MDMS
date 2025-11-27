@@ -3,12 +3,12 @@ services:
     build:
       context: ./backend
     container_name: website_backend
-    expose:
-      - "4000"
+    ports:
+      - "4000:4000"
     environment:
       - NODE_ENV=production
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:4000/health"]  # 寫你後端健康檢查路徑
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -19,7 +19,7 @@ services:
       context: ./frontend
     container_name: website_frontend
     ports:
-      - "8180:80"
+      - "80:80"
     depends_on:
       backend:
         condition: service_healthy    # ★ 等後端健康

@@ -19,7 +19,7 @@
     <v-tooltip text="修改">
       <template #activator="{ props }">
         <span v-bind="props">
-          <v-btn class="mx-1" icon="mdi-file-edit-outline" density="comfortable" :disabled="!canDelete" @click="$emit('update')" />
+          <v-btn class="mx-1" icon="mdi-file-edit-outline" density="comfortable" :disabled="!canEditBtn" @click="$emit('update')" />
         </span>
         </template>
     </v-tooltip>

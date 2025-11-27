@@ -99,7 +99,7 @@
   <!-- 左：手機漢堡鍵 + Logo + 標題 -->
   <v-app-bar-nav-icon class="d-md-none" @click="drawer = true" />
   <v-btn icon class="d-none d-md-inline-flex" @click="drawer = !drawer">
-    <img src="@/assets/logo.svg" alt="Logo" height="28" />
+    <img :src="logoUrl" alt="Logo" height="28" />
   </v-btn>
   <v-toolbar-title class="text-h6"> {{ route.meta?.title ? $t(route.meta.title) : '' }} </v-toolbar-title>
 
@@ -193,6 +193,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { ref, onMounted ,watch } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 
+const logoUrl = new URL('@/assets/logo.svg', import.meta.url).href
 const { mdAndUp } = useDisplay()  // true 表示 ≥ sm
 const { isLoggedIn, logout } = useAuth();
 const drawer = ref(false);
