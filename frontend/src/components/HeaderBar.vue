@@ -216,7 +216,7 @@ const { userId, userName, manager } = defineProps({
 })
 
 const router = useRouter()
-const changePassword = () => { window.open('http://example.com/change-password', '_blank') }
+const changePassword = () => { window.open('/ChangePassword', '_blank') }
 const goTo = (path) => router.push(path);
 
 // 切換語言

@@ -60,4 +60,55 @@ router.post('/login', async (req, res) => {
   }
 })
 
+
+router.post('/login/change-password', async (req, res) => {
+  const { userId, currentPassword, newPassword } = req.body;
+  console.log('req.body',req.body)
+
+  if (!userId || !currentPassword || !newPassword) {
+    return res.status(400).json({ message: '資料不足' });
+  }
+
+  try {
+    const pool = await getPool();
+
+    // 1️⃣ 查詢使用者資料
+    const result = await pool.request()
+      .input('id', sql.Int, userId)
+      .query('SELECT SA003 FROM dbo.SMSSA WHERE SA001 = @id'); // 自行修改資料表
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ message: '找不到使用者' });
+    }
+
+    const dbHash = sha256Hex(String(result.recordset[0].SA003 || ""));
+    console.log('dbHash:',dbHash)
+
+    // 2️⃣ 將使用者輸入的目前密碼 SHA256，比對
+    const currentHash = sha256Hex(currentPassword);    
+    console.log('currentHash:',currentHash)
+
+
+    if (currentHash !== dbHash) {
+      return res.status(400).json({ message: '目前密碼不正確' });
+    }
+
+    // 3️⃣ 將新密碼 SHA256
+    const newHash = sha256Hex(newPassword);
+
+    // 4️⃣ 更新資料庫
+    await pool.request()
+      .input('id', sql.NVarChar, String(userId).trim())
+      .input('newPassword', sql.VarChar, newPassword)
+      .query('UPDATE dbo.SMSSA SET SA003 = @newPassword WHERE SA001 = @id');
+
+    return res.json({ message: '密碼已成功變更' });
+
+  } catch (err) {
+    console.error('change-password error:', err);
+    return res.status(500).json({ message: '伺服器錯誤' });
+  }
+})
+
+
 module.exports = router

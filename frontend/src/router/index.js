@@ -12,9 +12,9 @@ import moldMaterialForm from '@/views/MoldMaterialForm.vue';
 import vendorForm from '@/views/VendorForm.vue';
 import moldBasicForm from '@/views/MoldBasicForm.vue';
 import toolexcel from '@/views/ExcelImport.vue';
+import changePasswordForm from '@/views/ChangePassword.vue';
 
 const routes = [
-  // { path: '/login', redirect: '/login' },
   {
     path: '/',
     name: 'home',
@@ -73,6 +73,11 @@ const routes = [
   { 
     path: '/login', 
     component: LoginView,
+    meta: { title: 'system' }
+  },
+  { 
+    path: '/ChangePassword', 
+    component: changePasswordForm,
     meta: { title: 'system' }
   },
   { 
