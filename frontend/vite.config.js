@@ -18,7 +18,8 @@ export default defineConfig(({ command, mode }) => {
       proxy: {
         // ⭐ 只在本機開發模式時用 proxy
         '/api': {
-          target: 'http://localhost:4000',
+          target: 'http://website_backend:4000',
+          //開發端：target: 'http://localhost:4000',
           changeOrigin: true,
           secure: false
         }
