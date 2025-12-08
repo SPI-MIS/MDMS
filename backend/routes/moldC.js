@@ -167,7 +167,7 @@ router.put('/moldC/:id', async (req, res) => {
       .input('MB002', sql.NVarChar, MB002 || 'N')
       .input('MB003', sql.NVarChar, MB003 || '')
       .input('id', sql.NVarChar, id.trim())
-      .query(`UPDATE dbo.SMSMB SET IssueState=@IssueState WHERE MB001=@id`);
+      .query(`UPDATE dbo.SMSMB SET MB002=@MB002, MB003=@MB003, IssueState=@IssueState WHERE MB001=@id`);
     
     console.log('修改成功:', result);
     res.json({ success: true, message: '修改成功' });

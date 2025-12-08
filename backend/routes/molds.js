@@ -168,9 +168,9 @@ router.put('/molds/:id', async (req, res) => {
     // 執行更新
     const result = await pool.request()
       .input('IssueState', sql.NVarChar, IssueState || '')
-      // .input('MA003', sql.NVarChar, MA003 || '')
+      .input('MA003', sql.NVarChar, MA003 || '')
       .input('id', sql.NVarChar, id.trim())
-      .query(`UPDATE dbo.SMSMA SET IssueState=@IssueState WHERE MA001=@id`);
+      .query(`UPDATE dbo.SMSMA SET MA003=@MA003, IssueState=@IssueState WHERE MA001=@id`);
     
     console.log('修改成功:', result);
     res.json({ success: true, message: '修改成功' });

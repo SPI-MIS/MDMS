@@ -175,7 +175,7 @@ router.put('/vendor/:id', async (req, res) => {
 
     // 執行更新
     const result = await pool.request()
-      .input('MD002', sql.NVarChar, MD002 || '')
+      .input('id', sql.NVarChar, id.trim())
       .input('MD003', sql.NVarChar, MD003 || '')
       .input('MD004', sql.NVarChar, MD004 || '')
       .input('MD005', sql.NVarChar, MD005 || '')
@@ -183,8 +183,23 @@ router.put('/vendor/:id', async (req, res) => {
       .input('MD007', sql.NVarChar, MD007 || '')
       .input('MD008', sql.NVarChar, MD008 || '')
       .input('MD009', sql.NVarChar, MD009 || '')
-      .input('id', sql.NVarChar, id.trim())
-      .query(`UPDATE dbo.SMSMD SET IssueState=@IssueState WHERE MD001=@id`);
+      .input('MD010', sql.NVarChar, MD002 || '')
+      .input('MD011', sql.NVarChar, MD003 || '')
+      .input('MD012', sql.NVarChar, MD004 || '')
+      .input('MD013', sql.NVarChar, MD005 || '')
+      .input('MD014', sql.NVarChar, MD006 || '')
+      .input('MD015', sql.NVarChar, MD007 || '')
+      .input('MD016', sql.NVarChar, MD008 || '')
+      .input('MD017', sql.NVarChar, MD009 || '')
+      .input('MD018', sql.NVarChar, MD008 || '')
+      .input('MD019', sql.NVarChar, MD009 || '')
+      .query(`UPDATE dbo.SMSMD SET MD003=@MD003, MD004=@MD004, MD005=@MD005, 
+                                   MD006=@MD006, MD007=@MD007, MD008=@MD008, 
+                                   MD009=@MD009, MD010=@MD010, MD011=@MD011, 
+                                   MD012=@MD012, MD013=@MD013, MD014=@MD014, 
+                                   MD015=@MD015, MD016=@MD016, MD017=@MD017,
+                                   MD018=@MD018, MD019=@MD019,
+                                   IssueState=@IssueState WHERE MD001=@id`);
     
     console.log('修改成功:', result);
     res.json({ success: true, message: '修改成功' });

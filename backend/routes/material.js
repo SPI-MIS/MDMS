@@ -163,7 +163,7 @@ router.put('/material/:id', async (req, res) => {
     const result = await pool.request()
       .input('MC002', sql.NVarChar, MC002 || '')
       .input('id', sql.NVarChar, id.trim())
-      .query(`UPDATE dbo.SMSMC SET IssueState=@IssueState WHERE MC001=@id`);
+      .query(`UPDATE dbo.SMSMC SET MC002=@MC002, IssueState=@IssueState WHERE MC001=@id`);
     
     console.log('修改成功:', result);
     res.json({ success: true, message: '修改成功' });

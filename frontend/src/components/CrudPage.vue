@@ -9,6 +9,7 @@
         :issue-state="form.IssueState"
         @new="onNew"
         @search="searchDialog = true"
+        @update="onEdit"
         @delete="onDelete"
         @copy="onCopy"
         @approve="onApprove"
@@ -54,7 +55,7 @@
           </v-col>
 
           <v-col cols="12" class="d-flex justify-end">
-            <v-btn color="primary" @click="onSave">儲存</v-btn>
+            <v-btn color="primary" @click="onSave" :disabled="!editable">儲存</v-btn>
           </v-col>
         </v-row>
       </v-card-text>
@@ -97,6 +98,7 @@ import ActionButtons from '@/components/ActionButtons.vue'
 import { useAuth } from '@/composables/useAuth'
 
 const fieldHints = reactive({})
+const editable = ref(false)   // ← 預設不可編輯
 
 // ── 由各頁傳入的差異化參數 ─────────────────────────
 const props = defineProps({
@@ -407,6 +409,10 @@ async function onSave() {
   else await axios.put(`${apiBase.value}/${id}`, payload)
   await loadOne(id)
   alert('儲存成功')
+}
+
+async function onEdit() {
+  editable.value = true
 }
 
 async function onDelete() {

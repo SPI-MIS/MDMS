@@ -175,9 +175,9 @@
       <v-divider class="my-1" />
       <!-- 語系：手機用簡單清單 -->
       <v-list-subheader>Language</v-list-subheader>
-      <v-list-item v-for="l in languages" :key="l.key" @click="lang = l; changeLang()" >
+      <v-list-item v-for="lang in languages" :key="lang.key" @click="onSelectLang(lang)" >
         <div class="d-flex align-center" style="gap:8px;">
-          <v-img :src="l.image" width="28" aspect-ratio="1.6" class="rounded-sm" cover />
+          <v-img :src="lang.image" width="28" aspect-ratio="1.6" class="rounded-sm" cover />
         </div>
       </v-list-item>
     </v-list>
@@ -249,6 +249,11 @@ onMounted(() => {
     }
   }
 })
+
+const onSelectLang = (lang) => {
+  lang.value = lang
+  changeLang()
+}
 
 </script>
 
