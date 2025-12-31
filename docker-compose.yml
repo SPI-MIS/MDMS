@@ -12,7 +12,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks: [webnet]
+    networks: [mdms_webnet]
 
   frontend:
     build:
@@ -23,10 +23,10 @@ services:
     depends_on:
       backend:
         condition: service_healthy    # ★ 等後端健康
-    networks: [webnet]
+    networks: [mdms_webnet]
 
 
 networks:
-  webnet:
+  mdms_webnet:
     driver: bridge
 
