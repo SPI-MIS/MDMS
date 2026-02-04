@@ -23,7 +23,8 @@ const config = {
 // ⚠️ 不使用全域 pool，確保每次查詢都建立新 session
 async function getPool () {
   try {
-    const pool = await sql.connect(config)
+    // Use a dedicated ConnectionPool instance to avoid interfering with other DB modules
+    const pool = await new sql.ConnectionPool(config).connect()
     return pool
   } catch (err) {
     console.error('❌ SQL Connect Error:', err)

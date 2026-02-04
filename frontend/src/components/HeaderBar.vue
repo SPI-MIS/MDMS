@@ -7,74 +7,73 @@
         <v-list-item-title>{{ $t('home') }}</v-list-item-title>
       </v-list-item>
 
-      <!-- 模具管理（階層） -->
+      <!-- 模具管理系統 -->
+      <!-- <v-list-group prepend-icon="mdi-database">
+        <template #activator="{ props }">
+          <v-list-item v-bind="props" @click="goTo('/mdmshome')">
+            <v-list-item-title>{{ $t('mdms.home') }}</v-list-item-title>
+          </v-list-item>
+        </template>
+        <v-list-item v-bind="props" @click="goTo('/settings')">
+          <v-list-item-title>{{ $t('mdms.settings') }}</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item v-bind="props" @click="goTo('/status')">
+          <v-list-item-title>{{ $t('mdms.status') }}</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item v-bind="props" @click="goTo(isLoggedIn ? '/profile' : '/login')">
+          <v-list-item-title>{{ $t('mdms.profile') }}</v-list-item-title>
+        </v-list-item>        
+      </v-list-group>
+
+      <v-divider /> -->
+
+      <!-- 除外工時管理 -->
       <v-list-group prepend-icon="mdi-database">
-        <template #activator="{ props }">
-          <v-list-item v-bind="props" @click="goTo('/settings')">
-            <v-list-item-title>{{ $t('settings') }}</v-list-item-title>
+        <template #activator="{ props: activatorProps }">
+          <v-list-item v-bind="activatorProps">
+            <v-list-item-title>{{ $t('exclusion.home') }}</v-list-item-title>
           </v-list-item>
         </template>
-
-        <v-list-item @click="goTo(isLoggedIn ? '/mold-type' : '/login')">
-          <v-list-item-title>{{ $t('moldTypeForm') }}</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item @click="goTo(isLoggedIn ? '/mold-category' : '/login')">
-          <v-list-item-title>{{ $t('moldCategory') }}</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item @click="goTo(isLoggedIn ? '/material' : '/login')">
-          <v-list-item-title>{{ $t('material') }}</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item @click="goTo(isLoggedIn ? '/vendor' : '/login')">
-          <v-list-item-title>{{ $t('vendor') }}</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item @click="goTo(isLoggedIn ? '/mold-basic' : '/login')">
-          <v-list-item-title>{{ $t('moldBasic') }}</v-list-item-title>
-        </v-list-item>
+        <v-list-item @click="goTo('/exclusionhome')">
+          <v-list-item-title>{{ $t('exclusion.settings') }}</v-list-item-title>
+        </v-list-item>        
       </v-list-group>
-
+      
       <v-divider />
 
-      <!-- 模具狀態管理（階層） -->
-      <v-list-group prepend-icon="mdi-state-machine">
-        <template #activator="{ props }">
-          <v-list-item v-bind="props" @click="goTo(isLoggedIn ? '/status' : '/login')">
-            <v-list-item-title>{{ $t('status') }}</v-list-item-title>
-          </v-list-item>
-        </template>
-
-        <v-list-item @click="goTo(isLoggedIn ? '/mold-status' : '/login')">
-          <v-list-item-title>模具狀態</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item @click="goTo(isLoggedIn ? '/mold-fix' : '/login')">
-          <v-list-item-title>模具維修</v-list-item-title>
-        </v-list-item>
-      </v-list-group>
-
-      <v-divider />
-
-      <!-- 模具履歷管理（階層） -->
+      <!-- 訂便當系統管理 -->
       <v-list-group prepend-icon="mdi-file-account">
-        <template #activator="{ props }">
-          <v-list-item v-bind="props" @click="goTo(isLoggedIn ? '/profile' : '/login')">
-            <v-list-item-title>{{ $t('profile') }}</v-list-item-title>
+        <template #activator="{ props: activatorPropsOrder }">
+          <v-list-item v-bind="activatorPropsOrder">
+            <v-list-item-title>{{ $t('order.home') }}</v-list-item-title>
           </v-list-item>
         </template>
 
         <v-list-item @click="goTo(isLoggedIn ? '/mold-type' : '/login')">
-          <v-list-item-title>生產履歷</v-list-item-title>
-        </v-list-item>
-
-        <v-list-item @click="goTo(isLoggedIn ? '/mold-category' : '/login')">
-          <v-list-item-title>模具壽命</v-list-item-title>
+          <v-list-item-title>{{ $t('order.settings') }}</v-list-item-title>
         </v-list-item>
       </v-list-group>
-
       <v-divider />
+
+      <!-- 投票系統管理 -->
+      <v-list-group prepend-icon="mdi-file-account">
+        <template #activator="{ props: activatorPropsVote }">
+          <v-list-item v-bind="activatorPropsVote">
+            <v-list-item-title>{{ $t('vote.home') }}</v-list-item-title>
+          </v-list-item>
+        </template>
+
+        <v-list-item @click="goTo('/employee-vote')">
+          <v-list-item-title>{{ $t('vote.employeeVoting') }}</v-list-item-title>
+        </v-list-item>
+        <v-list-item v-if="showVoteAdmin || String(manager) === '1' || String(admin) === '1'" @click="goTo('/votes')">
+          <v-list-item-title>{{ $t('vote.createActivity') }}</v-list-item-title>
+        </v-list-item>
+      </v-list-group>
+      <v-divider />
+
       <!-- 小工具（首頁） -->
       <v-list-item @click="goTo('/tool_excelimport')">
         <v-list-item-title>{{ $t('excelimport') }}</v-list-item-title>
@@ -82,7 +81,11 @@
 
       <!-- 系統管理 -->
       <v-list-item v-if="String(manager) === '1'" @click="goTo('/manage')">
-        <v-list-item-title>{{ $t('manage') }}</v-list-item-title>
+        <v-list-item-title>{{ $t('manage.home') }}</v-list-item-title>
+      </v-list-item>
+      
+      <v-list-item v-if="showVoteAdmin || String(manager) === '1' || String(admin) === '1'" @click="goTo('/vote-admin')">
+        <v-list-item-title>{{ $t('vote.adminPanel') }}</v-list-item-title>
       </v-list-item>
 
       <!-- 登出/登入 -->
@@ -109,8 +112,8 @@
   <div class="d-none d-md-flex align-center" style="gap: 8px;">
     <template v-if="userId && userName">
       <v-menu offset-y>
-        <template #activator="{ props }">
-          <v-btn v-bind="props" variant="text" class="text-white text-decoration-underline">
+        <template #activator="{ props: menuProps }">
+          <v-btn v-bind="menuProps" variant="text" class="text-white text-decoration-underline">
             {{ userName }} 您好！<v-icon end>mdi-menu-down</v-icon>
           </v-btn>
         </template>
@@ -122,12 +125,12 @@
           <v-list-item @click="changePassword">
             <v-list-item-title>{{ $t('changePassword') }}</v-list-item-title>
           </v-list-item>
-          <v-list-item @click="goTo('/')">
+          <v-list-item @click="goTo('/mdmshome')">
             <v-list-item-title>{{ $t('home') }}</v-list-item-title>
           </v-list-item>
           <v-divider class="my-1" />
-          <v-list-item v-if="String(manager) === '1'" @click="goTo('/manage')">
-            <v-list-item-title>{{ $t('manage') }}</v-list-item-title>
+          <v-list-item v-if="showAdminPanel || String(manager) === '1'" @click="goTo('/manage')">
+            <v-list-item-title>{{ $t('manage.home') }}</v-list-item-title>
           </v-list-item>
          
           <v-list-item @click="logout">
@@ -160,8 +163,8 @@
 
   <!-- 右：手機精簡操作（更多） -->
   <v-menu v-if="!mdAndUp" location="bottom end">
-    <template #activator="{ props }">
-      <v-btn icon v-bind="props"><v-icon>mdi-dots-vertical</v-icon></v-btn>
+    <template #activator="{ props: mobileProps }">
+      <v-btn icon v-bind="mobileProps"><v-icon>mdi-dots-vertical</v-icon></v-btn>
     </template>
     <v-list density="compact">
       <v-list-item v-if="userId && userName">
@@ -209,10 +212,13 @@ useI18n({ useScope: 'global' })
 const { locale } = useI18n()
 const lang = ref(languages.find(l => l.key === locale.value) || languages[0])
 
-const { userId, userName, manager } = defineProps({
+const { userId, userName, manager, admin, showAdminPanel, showVoteAdmin } = defineProps({
   userId: { type: String, default: '' },
   userName: { type: String, default: '' },
-  manager: { type: String, default: '' }
+  manager: { type: String, default: '' },
+  admin: { type: String, default: '' },
+  showAdminPanel: { type: Boolean, default: false },
+  showVoteAdmin: { type: Boolean, default: false }
 })
 
 const router = useRouter()

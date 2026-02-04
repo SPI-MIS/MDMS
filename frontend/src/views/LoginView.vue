@@ -1,13 +1,5 @@
 <template>   
   <v-app>
-    <!-- 頂部欄 -->
-    <!-- <HeaderBar
-      :user-id="userId"
-      :user-name="userName"
-      :manager="manager"
-    /> -->
-    <!-- 登入頁主內容 -->
-    <!-- <v-container> ... </v-container> -->
       <v-container class="d-flex align-center justify-center" style="height: 100vh">
         <v-card width="400">
         <v-card-title class="justify-center">登入</v-card-title>
@@ -67,16 +59,17 @@ const submitLogin = async () => {
     })
 
     // 登入成功：將帳號資訊傳出給 App.vue，並寫入 localStorage
-    const { userId, userName, manager } = res.data
+    const { userId, userName, manager, admin } = res.data
 
-    emit('login-success', { userId, userName, manager })
+    emit('login-success', { userId, userName, manager, admin })
 
     if (res.data.success) {
       login({
         userId: res.data.userId,
         userName: res.data.userName,
         manager: res.data.manager,
-        perms:    res.data.perms     // { C,R,U,D,A } booleans
+        admin: res.data.admin,
+        perms:res.data.perms     // { C,R,U,D,A } booleans
       });
 
       router.push('/'); // 導向首頁

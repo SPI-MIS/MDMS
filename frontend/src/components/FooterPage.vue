@@ -14,16 +14,3 @@
     </v-container>
   </v-footer>
 </template>
-
-
-<script setup>
-// 無需 script 區塊，因為使用簡單顯示內容。
-</script>
-
-<style scoped>
-.v-footer {
-  font-size: 12px;
-  background-color: #f8f8f8; /* 可視情況調整 */
-  border-top: 1px solid #ddd;
-}
-</style>

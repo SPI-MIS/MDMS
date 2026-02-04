@@ -23,7 +23,8 @@ let pool // 單例
 async function getPool () {
   if (pool?.connected) return pool
   if (pool) { try { await pool.close() } catch (_) {} }
-  pool = await sql.connect(config)
+  // Create a dedicated ConnectionPool instance
+  pool = await new sql.ConnectionPool(config).connect()
   return pool
 }
 

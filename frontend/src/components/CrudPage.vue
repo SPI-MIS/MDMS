@@ -248,7 +248,20 @@ function bindModels() {
     }
   })
 }
-const resolveReadonly = (f) => typeof f.readonly === 'function' ? f.readonly({ isNew: isNew.value, form }) : !!f.readonly
+const resolveReadonly = (f) => {
+  // 新增模式時，依照 schema 的 readonly 定義
+  if (isNew.value) {
+    return typeof f.readonly === 'function' ? f.readonly({ isNew: isNew.value, form }) : !!f.readonly
+  }
+  
+  // 編輯模式時：若未點編輯按鈕，所有欄位都禁用（除了預設 readonly 的欄位）
+  // 若已點編輯按鈕，才依照 schema 的 readonly 定義
+  if (!editable.value) {
+    return true  // 未進入編輯模式，所有欄位都禁用
+  }
+  
+  return typeof f.readonly === 'function' ? f.readonly({ isNew: isNew.value, form }) : !!f.readonly
+}
 
 // 存每個欄位的 lookup 設定與執行器
 const lookupConfigs  = {}   // key -> f.lookup
@@ -408,11 +421,12 @@ async function onSave() {
   if (isNew.value) await axios.post(apiBase.value, payload)
   else await axios.put(`${apiBase.value}/${id}`, payload)
   await loadOne(id)
+  editable.value = false  // 儲存後回到只讀模式
   alert('儲存成功')
 }
 
 async function onEdit() {
-  editable.value = true
+  editable.value = true  // 開放編輯
 }
 
 async function onDelete() {
@@ -447,6 +461,7 @@ async function loadOne(id) {
   const { data } = await axios.get(`${apiBase.value}/${id}`)
   Object.assign(form, data)
   isNew.value = false
+  editable.value = false  // 載入單筆後回到只讀模式
 }
 
 /* 查詢 */
@@ -466,6 +481,7 @@ function closeSearchDialog() {
 function pick(item) {
   searchDialog.value = false
   isNew.value = false
+  editable.value = false  // 選取後也回到只讀模式
   Object.assign(form, item)
 }
 </script>

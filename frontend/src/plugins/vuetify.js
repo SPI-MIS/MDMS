@@ -20,13 +20,13 @@ const vuetify = createVuetify({
       myCustomTheme: {
         dark: false,
         colors: {
-          primary: '#1976d2',      // ✅ 主色
-          secondary: '#2196f3',
-          accent: '#82B1FF',
-          error: '#FF5252',
-          info: '#2196F3',
-          success: '#4CAF50',
-          warning: '#FFC107',
+          primary: '#1D4E89',      // ✅ 主色
+          secondary: '#7DCFB6',
+          accent: '#FBDEA2',
+          error: '#F79256',
+          info: '#00B2CA',
+          success: '#99CCCC',
+          warning: '#CC0033',
         },
       },
     },

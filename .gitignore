@@ -2,3 +2,6 @@
 /backend/node_modules
 /node_modules
 /backend/.env
+/backend/server_debug.err
+/backend/server_debug.log
+/backend/scripts

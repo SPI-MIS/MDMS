@@ -25,37 +25,83 @@ router.get('/spi', async (req, res) => {
   }
 });
 
+// ⚠️ 重要：machine 路由必須在 :id 之前
+router.get('/machine', async (req, res) => {
+  const { line } = req.query;  // 接收 line 參數
+  console.log('[SPI] /machine called, line =', line);
+  
+  try {
+    const pool = await getPool();
+    
+    // 根據是否有 line 參數構建不同的查詢
+    let query = `SELECT MX001, MX002, MX003, MX004, MX005, MX006 FROM CMSMX WHERE MX004 != '0' AND MX002 != 'D'`;
+    let rs;
+    
+    // 如果有 line 參數，添加篩選條件
+    if (line) {
+      query += ` AND MX002 = @line`;  // 假設 MX002 是生產線別欄位
+      rs = await pool.request()
+        .input('line', sql.NVarChar, line)
+        .query(query);
+    } else {
+      rs = await pool.request().query(query);
+    }
+      
+    console.log('[SPI] machine count =', rs.recordset.length);
+    if (rs.recordset.length > 0) {
+      console.log('[SPI] first record =', rs.recordset[0]);
+    }
+    
+    res.json(rs.recordset);  // 直接返回原始資料
+  } catch (err) {
+    console.error('[SPI /machine] Error:', err.message);
+    res.status(500).json({ 
+      error: 'db_error', 
+      message: err.message
+    });
+  }
+});
+
+// 動態路徑必須在所有具體路徑之後
 const toAlnumUpper = s => String(s || '').toUpperCase();
+
 router.get('/spi/:id', async (req, res) => {
-  console.log('req =', req ,' ,res =', res);
-  const id = String(req.params.id || '').trim();
-  if (!id) return res.status(400).json({ error: 'id required' });
+  const rawId = req.params.id;
+  console.log('[SPI] /spi/:id called with id =', rawId);
+  
+  if (!rawId || rawId.trim() === '') {
+    return res.status(400).json({ error: 'id required' });
+  }
 
   try {
-    const raw = req.params.id ?? '';
-    const id  = toAlnumUpper(raw);
+    const id = toAlnumUpper(rawId);
 
-    // 僅允許 A~Z / 0~9
-    // if (!/^[A-Z0-9]+$/.test(id)) {
-    //   return res.status(400).json({ error: 'invalid_id', message: '僅允許英數字' });
-    // }
     const pool = await getPool();
     const rs = await pool.request()
       .input('id', sql.NVarChar, id)
       .query(`SELECT MA001, MA002 FROM SPI_20191231.dbo.PURMA WHERE MA001 = @id`);
       
-    console.log('[SPI] using DB =', rs.recordset?.[0]?.dbname);
+    console.log('[SPI] query result count =', rs.recordset.length);
+    
     if (!rs.recordset.length) {
-      return res.status(404).json({ error: 'not found' });
+      return res.status(404).json({ error: 'not_found', message: `找不到 ID: ${id}` });
     }
     
-
-    res.json(rs.recordset[0]); // { VA001, VA002 }
+    res.json(rs.recordset[0]);
   } catch (err) {
-    console.error('[SPI /spi/:id]', { id, message: err.message, number: err.number, code: err.code });
-    res.status(500).json({ error: 'db_error', message: err.message, number: err.number, code: err.code });
+    console.error('[SPI /spi/:id]', { 
+      id: rawId, 
+      message: err.message, 
+      number: err.number, 
+      code: err.code 
+    });
+    res.status(500).json({ 
+      error: 'db_error', 
+      message: err.message, 
+      number: err.number, 
+      code: err.code 
+    });
   }
 });
-
 
 module.exports = router;
