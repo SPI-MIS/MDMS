@@ -106,11 +106,11 @@
             <v-col cols="12" md="6">
               <p class="text-caption text-gray-600">{{ t('vote.status') }}</p>
               <v-chip
-                :color="getStatusColor(vote.voteStatus)"
+                :color="getStatusColor(vote)"
                 size="small"
                 text-color="white"
               >
-                {{ getStatusLabel(vote.voteStatus) }}
+                {{ getStatusLabel(vote) }}
               </v-chip>
             </v-col>
             <v-col cols="12" md="6">
@@ -118,11 +118,11 @@
               <p class="text-body2">{{ vote.createdBy }}</p>
             </v-col>
             <v-col cols="12" md="6">
-              <p class="text-caption text-gray-600">{{ t('vote.createdAt') }}</p>
+              <p class="text-caption text-gray-600">{{ t('common.createdAt') }}</p>
               <p class="text-body2">{{ formatDateTime(vote.createdAt) }}</p>
             </v-col>
             <v-col cols="12" md="6">
-              <p class="text-caption text-gray-600">{{ t('vote.updatedAt') }}</p>
+              <p class="text-caption text-gray-600">{{ t('common.updatedAt') }}</p>
               <p class="text-body2">{{ vote.updatedAt ? formatDateTime(vote.updatedAt) : '-' }}</p>
             </v-col>
           </v-row>
@@ -141,6 +141,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDateTime, deriveEffectiveStatus } from '@/utils/time'
 
 const { t } = useI18n()
 
@@ -168,34 +169,39 @@ const onClose = () => {
   emit('close')
 }
 
-const formatDateTime = (dateTime) => {
-  if (!dateTime) return '-'
-  const date = new Date(dateTime)
-  return date.toLocaleString('zh-TW', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+// 使用共用的 formatDateTime（由 '@/utils/time' 提供）
 
-const getStatusColor = (status) => {
+// 使用共用工具：parseDateTimeSafe/deriveEffectiveStatus
+// 已改為從 '@/utils/time' 匯入實作
+
+const getStatusColor = (voteOrStatus) => {
+  const status = typeof voteOrStatus === 'object'
+    ? deriveEffectiveStatus(voteOrStatus.voteStatus, voteOrStatus.startTime, voteOrStatus.endTime)
+    : voteOrStatus
+
   const colorMap = {
-    'Draft': 'grey',
-    'Active': 'blue',
-    'Closed': 'orange',
-    'Cancelled': 'red'
+    'draft.unpublished': 'grey',
+    'draft.pending': 'info',
+    'notStarted': 'blue',
+    'inProgress': 'success',
+    'ended': 'orange',
+    'cancelled': 'red'
   }
   return colorMap[status] || 'grey'
 }
 
-const getStatusLabel = (status) => {
+const getStatusLabel = (voteOrStatus) => {
+  const status = typeof voteOrStatus === 'object'
+    ? deriveEffectiveStatus(voteOrStatus.voteStatus, voteOrStatus.startTime, voteOrStatus.endTime)
+    : voteOrStatus
+
   const statusMap = {
-    'Draft': t('vote.statusDraft'),
-    'Active': t('vote.statusActive'),
-    'Closed': t('vote.statusClosed'),
-    'Cancelled': t('vote.statusCancelled')
+    'draft.unpublished': t('vote.statusDraftUnpublished'),
+    'draft.pending': t('vote.statusDraftPending'),
+    'notStarted': t('vote.notStarted'),
+    'inProgress': t('vote.statusActive'),
+    'ended': t('vote.statusClosed'),
+    'cancelled': t('vote.statusCancelled')
   }
   return statusMap[status] || ''
 }

@@ -57,6 +57,8 @@
               :items="voteTypeItems"
               :rules="rules.voteType"
               :readonly="!isNew && form.voteStatus !== 'Draft'"
+              item-title="title"
+              item-value="value"
               variant="outlined"
             />
           </v-col>
@@ -70,29 +72,44 @@
                 { value: true, title: t('vote.multipleChoice') }
               ]"
               :readonly="!isNew && form.voteStatus !== 'Draft'"
+              item-title="title"
+              item-value="value"
               variant="outlined"
             />
           </v-col>
 
+          <!-- <v-col cols="12">
+            <v-alert variant="outlined" density="comfortable" class="mb-4">
+              <div><strong>Debug</strong> — 下列有助於確認選項資料是否正確載入：</div>
+              <pre style="white-space:pre-wrap;">voteTypeItems: {{ JSON.stringify(voteTypeItems) }}</pre>
+              <pre style="white-space:pre-wrap;">statusItems: {{ JSON.stringify(statusItems) }}</pre>
+              <pre style="white-space:pre-wrap;">allowMultiple items: {{ JSON.stringify([{ value: false, title: t('vote.singleChoice') }, { value: true, title: t('vote.multipleChoice') }]) }}</pre>
+            </v-alert>
+          </v-col> -->
+
           <v-col cols="12" md="6">
             <v-text-field
               v-model="form.startTime"
-              :label="t('vote.startTime')"
-              type="datetime-local"
+              :label="`${t('vote.startTime')} (台北時區)`"
+              type="text"
+              placeholder="YYYY-MM-DD HH:MM"
               :rules="rules.startTime"
               :readonly="!isNew && form.voteStatus !== 'Draft'"
               variant="outlined"
+              @focus="focusStartTime"
             />
           </v-col>
 
           <v-col cols="12" md="6">
             <v-text-field
               v-model="form.endTime"
-              :label="t('vote.endTime')"
-              type="datetime-local"
+              :label="`${t('vote.endTime')} (台北時區)`"
+              type="text"
+              placeholder="YYYY-MM-DD HH:MM"
               :rules="rules.endTime"
               :readonly="!isNew && form.voteStatus !== 'Draft'"
               variant="outlined"
+              @focus="focusEndTime"
             />
           </v-col>
 
@@ -169,6 +186,8 @@
               v-model="form.voteStatus"
               :label="t('vote.status')"
               :items="statusItems"
+              item-title="title"
+              item-value="value"
               readonly
               variant="outlined"
             />
@@ -176,8 +195,8 @@
 
           <v-col cols="12" md="6">
             <v-text-field
-              :value="form.createdAt"
-              :label="t('vote.createdAt')"
+              :model-value="formatDateDisplay(form.createdAt)"
+              :label="t('common.createdAt')"
               readonly
               variant="outlined"
             />
@@ -225,14 +244,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useVoteStore } from '@/stores/vote'
+import { useAuth } from '@/composables/useAuth'
+import { formatDateTime, formatDateForTimezoneInput, parseLocalTimeInput } from '@/utils/time' 
 
 const { t } = useI18n()
 const router = useRouter()
 const voteStore = useVoteStore()
+const { userId, userName } = useAuth()
 
 const isNew = ref(true)
 const searchDialog = ref(false)
@@ -285,18 +307,18 @@ const rules = reactive({
   ]
 })
 
-const voteTypeItems = [
+const voteTypeItems = computed(() => [
   { value: 'general', title: t('vote.typeGeneral') },
   { value: 'rating', title: t('vote.typeRating') },
   { value: 'poll', title: t('vote.typePoll') }
-]
+])
 
-const statusItems = [
+const statusItems = computed(() => [
   { value: 'Draft', title: t('vote.statusDraft') },
   { value: 'Active', title: t('vote.statusActive') },
   { value: 'Closed', title: t('vote.statusClosed') },
   { value: 'Cancelled', title: t('vote.statusCancelled') }
-]
+])
 
 const resetForm = () => {
   form.voteId = ''
@@ -331,9 +353,12 @@ const onSave = async () => {
 
     form.voteOptions = validOptions
 
+    // 將用戶輸入的時間轉換為 ISO 格式（台北時區）
     const saveData = {
       ...form,
-      ...(isNew.value ? { createdBy: 'system' } : { updatedBy: 'system' })
+      startTime: parseUserTimeInput(form.startTime),
+      endTime: parseUserTimeInput(form.endTime),
+      ...(isNew.value ? { createdBy: userId.value || userName.value || 'SYSTEM' } : { updatedBy: userId.value || userName.value || 'SYSTEM' })
     }
 
     if (isNew.value) {
@@ -346,7 +371,8 @@ const onSave = async () => {
         alert(t('common.saveSuccess'))
         isNew.value = false
       }
-    } else {
+    } 
+    else {
       await voteStore.updateVote(form.voteId, saveData)
       alert(t('common.updateSuccess'))
     }
@@ -354,12 +380,13 @@ const onSave = async () => {
     console.error('Error saving vote:', error)
     alert(t('common.saveFailed'))
   }
+  router.push('/vote-admin')
 }
 
 const onCancel = () => {
   if (confirm(t('common.confirmCancel'))) {
     resetForm()
-    router.push('/')
+    router.push('/vote-admin')
   }
 }
 
@@ -381,20 +408,30 @@ const removeOption = (index) => {
   form.voteOptions.splice(index, 1)
 }
 
+/**
+ * 將 ISO 字符串轉換為台北時區的輸入格式 (YYYY-MM-DD HH:MM)
+ */
 const formatDateForInput = (dateStr) => {
-  if (!dateStr) return ''
-  try {
-    if (dateStr.includes(' ')) {
-      return dateStr.replace(' ', 'T')
-    }
-    const date = new Date(dateStr)
-    if (isNaN(date.getTime())) return ''
-    return date.toISOString().slice(0, 16)
-  } catch (error) {
-    console.error('Error formatting date:', error)
-    return ''
-  }
+  return formatDateForTimezoneInput(dateStr)
 }
+
+/**
+ * 將使用者輸入的時間字符串轉換為 ISO 格式
+ * 不添加時區偏移，讓後端根據用戶設定進行處理
+ */
+const parseUserTimeInput = (timeStr) => {
+  return parseLocalTimeInput(timeStr)
+}
+
+const focusStartTime = () => {
+  // 可選：在焦點時顯示日期選擇器或提示用戶格式
+}
+
+const focusEndTime = () => {
+  // 可選：在焦點時顯示日期選擇器或提示用戶格式
+}
+
+const formatDateDisplay = (dateStr) => formatDateTime(dateStr)
 
 onMounted(async () => {
   const voteId = router.currentRoute.value.params.id

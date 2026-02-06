@@ -65,6 +65,16 @@
       </v-col>
     </v-row>
 
+    <!-- 狀態說明（小字） -->
+    <v-card class="mb-4 pa-3">
+      <div class="text-caption text-gray-600">
+        <span v-for="(s, idx) in statusDescriptions" :key="s.key">
+          <v-chip :color="getStatusColor(s.key)" size="x-small" text-color="white" class="mr-1 mb-1">{{ getStatusLabel(s.key) }}</v-chip>
+          <span class="mr-3">{{ t(s.descKey) }}</span>
+        </span>
+      </div>
+    </v-card>
+
     <!-- 投票列表 -->
     <v-card>
       <v-table>
@@ -85,11 +95,11 @@
             <td>{{ vote.voteTitle }}</td>
             <td>
               <v-chip
-                :color="getStatusColor(vote.voteStatus)"
+                :color="getStatusColor(vote)"
                 size="small"
                 text-color="white"
               >
-                {{ getStatusLabel(vote.voteStatus) }}
+                {{ getStatusLabel(vote) }}
               </v-chip>
             </td>
             <td>{{ formatDateTime(vote.startTime) }}</td>
@@ -200,6 +210,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useVoteStore } from '@/stores/vote'
+import { formatDateTime, deriveEffectiveStatus } from '@/utils/time'
 import VoteDetailDialog from '@/components/vote/VoteDetailDialog.vue'
 import VoteStatisticsDialog from '@/components/vote/VoteStatisticsDialog.vue'
 
@@ -214,6 +225,7 @@ const statisticsDialog = ref(false)
 const activateDialog = ref(false)
 const selectedVote = ref(null)
 const voteStatistics = ref({})
+const isLoadingVotes = ref(false)  // 防止重複加載
 
 // Computed
 const filteredVotes = computed(() => {
@@ -231,10 +243,20 @@ const filteredVotes = computed(() => {
 const statistics = computed(() => {
   const votes = voteStore.votes || []
   const totalVotes = votes.length
-  const activeVotes = votes.filter(v => v.voteStatus === 'Active').length
-  const closedVotes = votes.filter(v => v.voteStatus === 'Closed').length
-  const cancelledVotes = votes.filter(v => v.voteStatus === 'Cancelled').length
-  const draftVotes = votes.filter(v => v.voteStatus === 'Draft').length
+
+  const counts = {
+    'draft.unpublished': 0,
+    'draft.pending': 0,
+    'notStarted': 0,
+    'inProgress': 0,
+    'ended': 0,
+    'cancelled': 0
+  }
+
+  for (const v of votes) {
+    const s = deriveEffectiveStatus(v.voteStatus, v.startTime, v.endTime)
+    if (counts[s] !== undefined) counts[s]++
+  }
 
   let totalParticipants = 0
   for (const stat of Object.values(voteStatistics.value)) {
@@ -245,45 +267,60 @@ const statistics = computed(() => {
 
   return {
     totalVotes,
-    activeVotes,
-    closedVotes,
-    cancelledVotes,
-    draftVotes,
+    activeVotes: counts['inProgress'],
+    closedVotes: counts['ended'],
+    cancelledVotes: counts['cancelled'],
+    draftVotes: counts['draft.unpublished'] + counts['draft.pending'],
     totalParticipants
   }
 })
 
 // 方法
-const formatDateTime = (dateTime) => {
-  const date = new Date(dateTime)
-  return date.toLocaleString('zh-TW', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+// 使用共用的 formatDateTime（由 '@/utils/time' 提供）
 
-const getStatusColor = (status) => {
+
+// 使用共用工具：parseDateTimeSafe/deriveEffectiveStatus（實作置於 '@/utils/time'）
+
+const getStatusColor = (voteOrStatus) => {
+  const status = typeof voteOrStatus === 'object'
+    ? deriveEffectiveStatus(voteOrStatus.voteStatus, voteOrStatus.startTime, voteOrStatus.endTime)
+    : voteOrStatus
+
   const colorMap = {
-    'Draft': 'grey',
-    'Active': 'blue',
-    'Closed': 'orange',
-    'Cancelled': 'red'
+    'draft.unpublished': 'grey',
+    'draft.pending': 'info',
+    'notStarted': 'blue',
+    'inProgress': 'success',
+    'ended': 'orange',
+    'cancelled': 'red'
   }
   return colorMap[status] || 'grey'
 }
 
-const getStatusLabel = (status) => {
+const getStatusLabel = (voteOrStatus) => {
+  const status = typeof voteOrStatus === 'object'
+    ? deriveEffectiveStatus(voteOrStatus.voteStatus, voteOrStatus.startTime, voteOrStatus.endTime)
+    : voteOrStatus
+
   const statusMap = {
-    'Draft': t('vote.statusDraft'),
-    'Active': t('vote.statusActive'),
-    'Closed': t('vote.statusClosed'),
-    'Cancelled': t('vote.statusCancelled')
+    'draft.unpublished': t('vote.statusDraftUnpublished'),
+    'draft.pending': t('vote.statusDraftPending'),
+    'notStarted': t('vote.notStarted'),
+    'inProgress': t('vote.statusActive'),
+    'ended': t('vote.statusClosed'),
+    'cancelled': t('vote.statusCancelled')
   }
   return statusMap[status] || ''
 }
+
+// 狀態說明清單（供 Template 顯示）
+const statusDescriptions = [
+  { key: 'draft.unpublished', descKey: 'vote.statusDescDraftUnpublished' },
+  { key: 'draft.pending', descKey: 'vote.statusDescDraftPending' },
+  { key: 'notStarted', descKey: 'vote.statusDescNotStarted' },
+  { key: 'inProgress', descKey: 'vote.statusDescInProgress' },
+  { key: 'ended', descKey: 'vote.statusDescEnded' }
+]
 
 const onNewVote = () => {
   router.push('/votes')
@@ -295,9 +332,18 @@ const onViewDetails = (vote) => {
 }
 
 const onViewStatistics = async (vote) => {
-  selectedVote.value = vote
   try {
-    await voteStore.fetchVoteResults(vote.voteId)
+    const results = await voteStore.fetchVoteResults(vote.voteId)
+    voteStatistics.value[vote.voteId] = results
+    // 合并 optionDetails 到 selectedVote
+    selectedVote.value = {
+      ...vote,
+      optionDetails: results.optionDetails
+    }
+    console.log('[VoteAdminView] Opening statistics dialog with data:', {
+      vote: selectedVote.value,
+      statistics: voteStatistics.value[vote.voteId]
+    })
     statisticsDialog.value = true
   } catch (error) {
     console.error('Error loading statistics:', error)
@@ -343,25 +389,61 @@ const onDeleteVote = async (vote) => {
 }
 
 const loadVotes = async () => {
+  // 防止重複加載
+  if (isLoadingVotes.value) {
+    console.log('[VoteAdminView] Already loading, skipping...')
+    return
+  }
+  
   try {
+    isLoadingVotes.value = true
+    console.log('[VoteAdminView] Loading votes...')
     await voteStore.fetchVotes()
-    // 載入統計資料
-    for (const vote of voteStore.votes) {
+    console.log('[VoteAdminView] Loaded', voteStore.votes.length, 'votes')
+    
+    // 先清空統計數據以避免舊數據
+    voteStatistics.value = {}
+    
+    // 批量加載統計資料（使用 Promise.all 並行加載）
+    const statisticsPromises = voteStore.votes.map(async (vote) => {
       try {
+        console.log('[VoteAdminView] Fetching results for', vote.voteId)
         const results = await voteStore.fetchVoteResults(vote.voteId)
-        voteStatistics.value[vote.voteId] = results
+        console.log('[VoteAdminView] Results for', vote.voteId, ':', results)
+        return { voteId: vote.voteId, results }
       } catch (error) {
         console.error(`Error loading statistics for ${vote.voteId}:`, error)
+        return null
       }
-    }
+    })
+    
+    // 等待所有統計數據加載完成，然後一次性更新
+    const allResults = await Promise.all(statisticsPromises)
+    
+    // 一次性更新所有統計數據（只觸發一次響應性更新）
+    const newStatistics = {}
+    allResults.forEach(item => {
+      if (item) {
+        newStatistics[item.voteId] = item.results
+      }
+    })
+    Object.assign(voteStatistics.value, newStatistics)
+    
+    console.log('[VoteAdminView] Final voteStatistics:', voteStatistics.value)
+    console.log('[VoteAdminView] Total participants:', statistics.value.totalParticipants)
   } catch (error) {
     console.error('Error loading votes:', error)
+  } finally {
+    isLoadingVotes.value = false
+    console.log('[VoteAdminView] Loading completed')
   }
 }
 
 // 初始化
 onMounted(async () => {
+  console.log('[VoteAdminView] onMounted called')
   await loadVotes()
+  console.log('[VoteAdminView] onMounted finished')
 })
 </script>
 

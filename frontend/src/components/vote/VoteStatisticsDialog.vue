@@ -113,6 +113,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDateTime } from '@/utils/time'
 
 const { t } = useI18n()
 
@@ -148,17 +149,7 @@ const onClose = () => {
   emit('close')
 }
 
-const formatDateTime = (dateTime) => {
-  if (!dateTime) return '-'
-  const date = new Date(dateTime)
-  return date.toLocaleString('zh-TW', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+// 使用共用的 formatDateTime（由 '@/utils/time' 提供）
 
 const calculateStatistics = () => {
   if (!props.statistics || !props.vote?.optionDetails) {

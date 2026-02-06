@@ -1,45 +1,40 @@
 {
-  "system":"南部化成",
+  "system": "南部化成",
   "login": "登入",
   "logout": "登出",
   "user": "使用者",
   "empId": "工號：{id}",
   "changePassword": "更改密碼",
   "home": "首頁",
-
-  "manage":{
-    "home":"後臺管理頁面",
-    "itmanage":"IT管理",
-    "mdms":"模具管理系統",
-    "vote":"公司投票系統"
+  
+  "manage": {
+    "home": "IT管理頁面",
+    "itmanage": "後台管理",
+    "itvotemanage": "投票狀態儀表板",
+    "mdms": "模具管理系統"
   },
-  "excelimport":"小工具",
-
-  "exclusion":{
-    "home":"除外工時首頁",
-    "settings":"除外工時資料管理"
+  "excelimport": "小工具",
+  "exclusion": {
+    "home": "除外工時首頁",
+    "settings": "除外工時資料管理"
   },
-
-  "order":
-  {
-    "home":"訂便當首頁",
-    "settings":"訂便當資料管理"
+  "order": {
+    "home": "訂便當首頁",
+    "settings": "訂便當資料管理"
   },
-
-  "mdms":{
-    "home":"模具管理首頁",
-    "settings":"模具資料管理",
-    "moldTypeForm":"模具種類資料管理",
-    "moldCategory":"模具分類資料管理",
-    "material":"模具材質資料管理",
-    "vendor":"廠商資料管理",
-    "moldBasic":"模具基本資料管理",      
-    "status":"模具進出管理",
-    "moldstatus":"模具狀態資料",
-    "moldfix":"模具維修資料",    
-    "profile":"模具履歷管理"
+  "mdms": {
+    "home": "模具管理首頁",
+    "settings": "模具資料管理",
+    "moldTypeForm": "模具種類資料管理",
+    "moldCategory": "模具分類資料管理",
+    "material": "模具材質資料管理",
+    "vendor": "廠商資料管理",
+    "moldBasic": "模具基本資料管理",
+    "status": "模具進出管理",
+    "moldstatus": "模具狀態資料",
+    "moldfix": "模具維修資料",
+    "profile": "模具履歷管理"
   },
-
   "common": {
     "save": "保存",
     "cancel": "取消",
@@ -53,18 +48,21 @@
     "status": "狀態",
     "createdAt": "建立時間",
     "updatedAt": "更新時間",
+    "createSuccess": "建立成功",
     "saveSuccess": "保存成功",
     "saveFailed": "保存失敗",
+    "updateSuccess": "更新成功",
     "deleteSuccess": "刪除成功",
     "deleteFailed": "刪除失敗",
     "searchFailed": "搜尋失敗",
     "error": "發生錯誤",
     "confirmCancel": "確認要取消嗎？",
     "confirm": "確認",
+    "all": "全部",
     "close": "關閉",
-    "actions": "操作"
+    "actions": "操作",
+    "noPermission": "您沒有權限訪問此頁面"
   },
-
   "validation": {
     "required": "此欄位為必填",
     "maxLength": "最多 {max} 個字元",
@@ -72,7 +70,6 @@
     "endTimeAfterStart": "結束時間必須晚於開始時間",
     "pleaseCheckFields": "請檢查所有必填欄位"
   },
-
   "vote": {
     "home": "投票首頁",
     "createActivity": "投票活動建立",
@@ -105,9 +102,18 @@
     "addOption": "新增選項",
     "status": "狀態",
     "statusDraft": "草稿",
+    "statusDraftUnpublished": "未發佈（草稿）",
+    "statusDraftPending": "待發佈（草稿)",
+    "notStarted": "尚未開始",
     "statusActive": "進行中",
     "statusClosed": "已結束",
     "statusCancelled": "已取消",
+    "statusDescriptions": "狀態說明",
+    "statusDescDraftUnpublished": "草稿但未到開始時間",
+    "statusDescDraftPending": "草稿但已到開始時間",
+    "statusDescNotStarted": "已發佈但未到開始時間",
+    "statusDescInProgress": "已發佈且已到開始時間",
+    "statusDescEnded": "已到結束時間",
     "minTwoOptions": "至少需要兩個投票選項",
     "confirmDelete": "確認要刪除此投票活動嗎？",
     "vote": "投票",
@@ -117,6 +123,8 @@
     "selectYourChoice": "請選擇您的選擇",
     "submitVote": "提交投票",
     "pleaseSelectOption": "請至少選擇一個選項",
+    "loginRequired": "請先登入後再投票",
+    "alreadyVoted": "您已在此投票活動中投票，無法重複投票",
     "voteSuccess": "投票成功",
     "voteSubmitted": "您的投票已提交",
     "canViewResultsAnytime": "您可以隨時查看投票結果",
@@ -134,7 +142,7 @@
     "createdBy": "建立者",
     "votes": "票",
     "voteStatistics": "投票統計",
-    "totalVotes": "進行中活動",
+    "totalVotes": "已建立活動",
     "totalParticipants": "已參與人數",
     "participationRate": "參與率",
     "optionStatistics": "選項統計",
@@ -185,6 +193,7 @@
     "notificationSettings": "通知設定",
     "notifyWhenVoteStarts": "投票開始時通知",
     "notifyWhenVoteEnds": "投票結束時通知",
-    "sendReminderEmail": "發送提醒郵件"
+    "sendReminderEmail": "發送提醒郵件",
+    "loadFailed": "載入失敗"
   }
 }

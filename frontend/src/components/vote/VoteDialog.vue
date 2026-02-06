@@ -79,8 +79,10 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAuth } from '@/composables/useAuth'
 
 const { t } = useI18n()
+const { userId } = useAuth()
 
 const props = defineProps({
   modelValue: {
@@ -130,6 +132,11 @@ const onSubmit = async () => {
     return
   }
 
+  if (!userId.value) {
+    errorMessage.value = t('vote.loginRequired')
+    return
+  }
+
   isSubmitting.value = true
 
   try {
@@ -138,7 +145,7 @@ const onSubmit = async () => {
       selectedOptions: props.vote.allowMultiple
         ? selectedOptions.value
         : [selectedOption.value],
-      userId: localStorage.getItem('userId'),
+      userId: userId.value,
       anonymous: props.vote.allowAnonymous,
       votedAt: new Date().toISOString()
     }
@@ -147,6 +154,7 @@ const onSubmit = async () => {
     resetForm()
   } catch (error) {
     errorMessage.value = error.message || t('common.error')
+    console.error('Error submitting vote:', error)
   } finally {
     isSubmitting.value = false
   }

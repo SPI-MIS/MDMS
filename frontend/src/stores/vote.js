@@ -7,6 +7,10 @@ export const useVoteStore = defineStore('vote', () => {
   const currentVote = ref(null)
   const loading = ref(false)
   const error = ref(null)
+  
+  // 緩存和請求追蹤
+  const resultsCache = ref({})  // 緩存投票結果
+  const pendingRequests = ref({})  // 追蹤正在進行的請求
 
   // Computed
   const activeVotes = computed(() => votes.value.filter(v => v.voteStatus === 'Active'))
@@ -21,6 +25,8 @@ export const useVoteStore = defineStore('vote', () => {
       const params = new URLSearchParams()
       if (query) params.append('q', query)
       if (state) params.append('state', state)
+      // 加入時間戳以避免快取舊結果
+      params.append('_t', Date.now())
 
       const response = await fetch(`/api/votes?${params.toString()}`)
       if (!response.ok) throw new Error('Failed to fetch votes')
@@ -147,7 +153,10 @@ export const useVoteStore = defineStore('vote', () => {
         body: JSON.stringify(voteData)
       })
 
-      if (!response.ok) throw new Error('Failed to submit vote')
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to submit vote')
+      }
 
       return await response.json()
     } catch (err) {
@@ -176,30 +185,57 @@ export const useVoteStore = defineStore('vote', () => {
   }
 
   // 方法：獲取投票結果
-  const fetchVoteResults = async (voteId) => {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await fetch(`/api/votes/${voteId}/results`)
-      if (!response.ok) throw new Error('Failed to fetch results')
-
-      const data = await response.json()
-      const voteIndex = votes.value.findIndex(v => v.voteId === voteId)
-      if (voteIndex > -1) {
-        votes.value[voteIndex] = {
-          ...votes.value[voteIndex],
-          ...data
-        }
-        currentVote.value = votes.value[voteIndex]
-      }
-      return data
-    } catch (err) {
-      error.value = err.message
-      console.error('Error fetching results:', err)
-      throw err
-    } finally {
-      loading.value = false
+  const fetchVoteResults = async (voteId, forceRefresh = false) => {
+    // 檢查緩存（除非強制刷新）
+    if (!forceRefresh && resultsCache.value[voteId]) {
+      console.log(`[Store] Using cached results for ${voteId}`)
+      return resultsCache.value[voteId]
     }
+    
+    // 檢查是否已有相同請求正在進行
+    if (pendingRequests.value[voteId]) {
+      console.log(`[Store] Waiting for existing request for ${voteId}`)
+      return pendingRequests.value[voteId]
+    }
+    
+    // 創建新的請求 Promise
+    const requestPromise = (async () => {
+      loading.value = true
+      error.value = null
+      try {
+        console.log(`[Store] Fetching results for ${voteId}`)
+        const response = await fetch(`/api/votes/${voteId}/results`)
+        if (!response.ok) throw new Error('Failed to fetch results')
+
+        const data = await response.json()
+        
+        // 緩存結果
+        resultsCache.value[voteId] = data
+        
+        const voteIndex = votes.value.findIndex(v => v.voteId === voteId)
+        if (voteIndex > -1) {
+          votes.value[voteIndex] = {
+            ...votes.value[voteIndex],
+            ...data
+          }
+          currentVote.value = votes.value[voteIndex]
+        }
+        return data
+      } catch (err) {
+        error.value = err.message
+        console.error('Error fetching results:', err)
+        throw err
+      } finally {
+        loading.value = false
+        // 清除請求追蹤
+        delete pendingRequests.value[voteId]
+      }
+    })()
+    
+    // 保存請求 Promise
+    pendingRequests.value[voteId] = requestPromise
+    
+    return requestPromise
   }
 
   // 方法：重置
@@ -207,6 +243,14 @@ export const useVoteStore = defineStore('vote', () => {
     votes.value = []
     currentVote.value = null
     error.value = null
+    resultsCache.value = {}
+    pendingRequests.value = {}
+  }
+  
+  // 方法：清除緩存
+  const clearCache = () => {
+    resultsCache.value = {}
+    console.log('[Store] Cache cleared')
   }
 
   return {
@@ -228,6 +272,7 @@ export const useVoteStore = defineStore('vote', () => {
     submitVote,
     checkUserVoted,
     fetchVoteResults,
-    reset
+    reset,
+    clearCache
   }
 })

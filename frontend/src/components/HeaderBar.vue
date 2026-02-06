@@ -74,19 +74,36 @@
       </v-list-group>
       <v-divider />
 
+      <!-- IT管理 -->
+      <v-list-group v-if="String(manager) === '1'" prepend-icon="mdi-file-account">
+        <template #activator="{ props: activatorPropsVote }">
+          <v-list-item v-bind="activatorPropsVote">
+            <v-list-item-title>{{ $t('manage.home') }}</v-list-item-title>
+          </v-list-item>
+        </template>
+
+        <v-list-item @click="goTo('/manage')">
+          <v-list-item-title>{{ $t('manage.itmanage') }}</v-list-item-title>
+        </v-list-item>
+        <v-list-item @click="goTo('/vote-itmanagement')">
+          <v-list-item-title>{{ $t('manage.itvotemanage') }}</v-list-item-title>
+        </v-list-item>
+      </v-list-group>
+      <v-divider />
+
       <!-- 小工具（首頁） -->
       <v-list-item @click="goTo('/tool_excelimport')">
         <v-list-item-title>{{ $t('excelimport') }}</v-list-item-title>
-      </v-list-item>
-
-      <!-- 系統管理 -->
-      <v-list-item v-if="String(manager) === '1'" @click="goTo('/manage')">
-        <v-list-item-title>{{ $t('manage.home') }}</v-list-item-title>
       </v-list-item>
       
       <v-list-item v-if="showVoteAdmin || String(manager) === '1' || String(admin) === '1'" @click="goTo('/vote-admin')">
         <v-list-item-title>{{ $t('vote.adminPanel') }}</v-list-item-title>
       </v-list-item>
+
+      <!-- 系統管理 -->
+      <!-- <v-list-item v-if="String(manager) === '1'" @click="goTo('/manage')">
+        <v-list-item-title>{{ $t('manage.home') }}</v-list-item-title>
+      </v-list-item> -->
 
       <!-- 登出/登入 -->
       <v-list-item v-if="isLoggedIn" @click="logout">
@@ -122,10 +139,10 @@
             <v-list-item-title>{{ $t('empId', { id: userId || '' }) }}</v-list-item-title>
           </v-list-item>
           <v-divider class="my-1" />
-          <v-list-item @click="changePassword">
+          <v-list-item v-if="showVoteAdmin || String(manager) === '1' || String(admin) === '1'" @click="changePassword">
             <v-list-item-title>{{ $t('changePassword') }}</v-list-item-title>
           </v-list-item>
-          <v-list-item @click="goTo('/mdmshome')">
+          <v-list-item @click="goTo('/')">
             <v-list-item-title>{{ $t('home') }}</v-list-item-title>
           </v-list-item>
           <v-divider class="my-1" />
@@ -172,7 +189,7 @@
       </v-list-item>
       <v-list-item @click="goTo('/')" title="首頁" />
       <v-list-item v-if="String(manager) === '1'" @click="goTo('/manage')" title="系統管理" />
-      <v-list-item v-if="userId && userName" @click="changePassword" title="變更密碼" />
+      <v-list-item v-if="showVoteAdmin || String(manager) === '1' || String(admin) === '1'"S @click="changePassword" title="變更密碼" />
       <v-list-item v-if="userId && userName" @click="logout" title="登出" />
       <v-list-item v-else @click="goTo('/login')" title="登入" />
       <v-divider class="my-1" />

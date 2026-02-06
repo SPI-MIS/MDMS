@@ -79,7 +79,7 @@
                             >
                               {{ getStatusLabel(item.status) }}
                             </v-chip>
-                          </td>
+                          </td> 
                           <td class="text-right font-weight-bold">{{ item.count }}</td>
                           <td class="text-right">{{ item.percentage }}%</td>
                         </tr>
@@ -141,11 +141,11 @@
                     <td>{{ vote.activityName }}</td>
                     <td>
                       <v-chip
-                        :color="getStatusColor(vote.voteStatus)"
+                        :color="getStatusColor(vote)"
                         size="small"
                         text-color="white"
                       >
-                        {{ getStatusLabel(vote.voteStatus) }}
+                        {{ getStatusLabel(vote) }}
                       </v-chip>
                     </td>
                     <td class="text-right">{{ vote.participantCount }}</td>
@@ -284,6 +284,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useVoteStore } from '@/stores/vote'
+import { formatDateTime, deriveEffectiveStatus } from '@/utils/time'
 
 const { t } = useI18n()
 const voteStore = useVoteStore()
@@ -338,22 +339,37 @@ const filteredLogs = computed(() => {
 })
 
 // 方法
-const getStatusColor = (status) => {
+
+// 使用共用工具：parseDateTimeSafe/deriveEffectiveStatus（實作置於 '@/utils/time'）
+
+const getStatusColor = (voteOrStatus) => {
+  const status = typeof voteOrStatus === 'object'
+    ? deriveEffectiveStatus(voteOrStatus.voteStatus, voteOrStatus.startTime, voteOrStatus.endTime)
+    : voteOrStatus
+
   const colorMap = {
-    'Draft': 'grey',
-    'Active': 'blue',
-    'Closed': 'orange',
-    'Cancelled': 'red'
+    'draft.unpublished': 'grey',   // 未發布（草稿）
+    'draft.pending': 'info',       // 待發布（草稿）
+    'notStarted': 'blue',          // 尚未開始
+    'inProgress': 'success',       // 進行中
+    'ended': 'orange',             // 已結束
+    'cancelled': 'red'             // 已取消
   }
   return colorMap[status] || 'grey'
 }
 
-const getStatusLabel = (status) => {
+const getStatusLabel = (voteOrStatus) => {
+  const status = typeof voteOrStatus === 'object'
+    ? deriveEffectiveStatus(voteOrStatus.voteStatus, voteOrStatus.startTime, voteOrStatus.endTime)
+    : voteOrStatus
+
   const statusMap = {
-    'Draft': t('vote.statusDraft'),
-    'Active': t('vote.statusActive'),
-    'Closed': t('vote.statusClosed'),
-    'Cancelled': t('vote.statusCancelled')
+    'draft.unpublished': t('vote.statusDraftUnpublished'),
+    'draft.pending': t('vote.statusDraftPending'),
+    'notStarted': t('vote.notStarted'),
+    'inProgress': t('vote.statusActive'),
+    'ended': t('vote.statusClosed'),
+    'cancelled': t('vote.statusCancelled')
   }
   return statusMap[status] || ''
 }
@@ -369,40 +385,46 @@ const getActionColor = (action) => {
   return colorMap[action] || 'default'
 }
 
-const formatDateTime = (dateTime) => {
-  if (!dateTime) return '-'
-  const date = new Date(dateTime)
-  return date.toLocaleString('zh-TW', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 const loadStatistics = async () => {
   loading.value = true
   try {
     await voteStore.fetchVotes()
 
-    // 計算統計數據
-    const votes = voteStore.votes
-    statistics.value = {
-      totalVotes: votes.length,
-      activeVotes: votes.filter(v => v.voteStatus === 'Active').length,
-      closedVotes: votes.filter(v => v.voteStatus === 'Closed').length,
-      cancelledVotes: votes.filter(v => v.voteStatus === 'Cancelled').length,
-      draftVotes: votes.filter(v => v.voteStatus === 'Draft').length,
-      totalParticipants: votes.reduce((sum, v) => sum + (v.participants?.length || 0), 0)
+    // 計算統計數據（根據衍生狀態）
+    const votes = voteStore.votes || []
+
+    // 對每個 vote 計算有效狀態並統計
+    const counts = {
+      'draft.unpublished': 0,
+      'draft.pending': 0,
+      'notStarted': 0,
+      'inProgress': 0,
+      'ended': 0,
+      'cancelled': 0
     }
 
-    // 狀態分佈
+    for (const v of votes) {
+      const s = deriveEffectiveStatus(v.voteStatus, v.startTime, v.endTime)
+      if (counts[s] !== undefined) counts[s]++
+    }
+
+    statistics.value = {
+      totalVotes: votes.length,
+      activeVotes: counts['inProgress'],
+      closedVotes: counts['ended'],
+      cancelledVotes: counts['cancelled'],
+      draftVotes: counts['draft.unpublished'] + counts['draft.pending'],
+      totalParticipants: votes.reduce((sum, v) => sum + (v.participantCount || 0), 0)
+    }
+
+    // 狀態分佈（依使用者指定的五種狀態）
     statusDistribution.value = [
-      { status: 'Draft', count: statistics.value.draftVotes },
-      { status: 'Active', count: statistics.value.activeVotes },
-      { status: 'Closed', count: statistics.value.closedVotes },
-      { status: 'Cancelled', count: statistics.value.cancelledVotes }
+      { status: 'draft.unpublished', count: counts['draft.unpublished'] },
+      { status: 'draft.pending', count: counts['draft.pending'] },
+      { status: 'notStarted', count: counts['notStarted'] },
+      { status: 'inProgress', count: counts['inProgress'] },
+      { status: 'ended', count: counts['ended'] },
+      { status: 'cancelled', count: counts['cancelled'] }
     ].map(item => ({
       ...item,
       percentage: statistics.value.totalVotes > 0 ? Math.round((item.count / statistics.value.totalVotes) * 100) : 0
@@ -419,7 +441,7 @@ const loadStatistics = async () => {
     // 最近的活動
     recentVotes.value = votes.slice(0, 10).map(v => ({
       ...v,
-      participantCount: v.participants?.length || 0,
+      participantCount: v.participantCount || 0,
       voteCount: 0
     }))
 
@@ -432,6 +454,17 @@ const loadStatistics = async () => {
       details: `Created vote: ${v.activityName}`,
       createdAt: v.createdAt
     }))
+
+    // 用戶管理（連動資料庫）
+    try {
+      const userStatsResponse = await fetch(`/api/votes/user-stats?limit=50&_t=${Date.now()}`)
+      if (!userStatsResponse.ok) throw new Error('Failed to fetch user stats')
+      const userStats = await userStatsResponse.json()
+      topVoters.value = userStats
+    } catch (userStatsError) {
+      console.error('Error loading user stats:', userStatsError)
+      topVoters.value = []
+    }
   } catch (error) {
     console.error('Error loading statistics:', error)
   } finally {

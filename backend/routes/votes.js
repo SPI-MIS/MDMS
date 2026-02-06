@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/db_votes');
+const { formatToISO } = require('../utils/time')
 
 /**
  * 將 ISO 8601 日期轉換為 MySQL DATETIME 格式 (YYYY-MM-DD HH:MM:SS)
@@ -29,21 +30,79 @@ router.get('/votes', async (req, res) => {
   const { q = '', state = '' } = req.query;
   try {
     let query = `
-      SELECT voteId, activityName, activityCode, voteTitle, voteStatus, startTime, endTime, createdAt, createdBy
-      FROM Votes
-      WHERE (activityName LIKE ? OR voteTitle LIKE ?)
+      SELECT 
+        v.voteId, 
+        v.activityName, 
+        v.activityCode, 
+        v.voteTitle, 
+        v.voteStatus, 
+        v.startTime, 
+        v.endTime, 
+        v.createdAt, 
+        v.createdBy,
+        COUNT(DISTINCT vp.userId) as participantCount
+      FROM Votes v
+      LEFT JOIN VoteParticipants vp ON v.voteId = vp.voteId
+      WHERE (v.activityName LIKE ? OR v.voteTitle LIKE ?)
     `;
     const params = [`%${q}%`, `%${q}%`];
 
     if (state) {
-      query += ' AND voteStatus = ?';
+      query += ' AND v.voteStatus = ?';
       params.push(state);
     }
 
-    query += ' ORDER BY createdAt DESC';
+    query += ' GROUP BY v.voteId ORDER BY v.createdAt DESC';
 
     const [results] = await pool.query(query, params);
-    res.json(results);
+    // Format date fields to ISO format without timezone assumption
+    const formatted = results.map(r => ({
+      ...r,
+      startTime: formatToISO(r.startTime),
+      endTime: formatToISO(r.endTime),
+      createdAt: formatToISO(r.createdAt),
+      updatedAt: r.updatedAt ? formatToISO(r.updatedAt) : null,
+      participantCount: r.participantCount || 0
+    }))
+    
+    // 添加時間戳防止緩存
+    res.set('X-Query-Timestamp', Date.now().toString())
+    res.json(formatted);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 使用者投票統計
+ * GET /api/votes/user-stats?limit=50
+ */
+router.get('/votes/user-stats', async (req, res) => {
+  const { limit = '50' } = req.query;
+  const safeLimit = Math.min(parseInt(limit, 10) || 50, 200);
+  try {
+    const [rows] = await pool.query(
+      `SELECT 
+        vp.userId,
+        COUNT(*) as voteCount,
+        MIN(vp.votedAt) as firstVoteTime,
+        MAX(vp.votedAt) as lastVoteTime
+      FROM VoteParticipants vp
+      GROUP BY vp.userId
+      ORDER BY voteCount DESC, lastVoteTime DESC
+      LIMIT ?`,
+      [safeLimit]
+    );
+
+    const formatted = rows.map(r => ({
+      ...r,
+      firstVoteTime: r.firstVoteTime ? formatToISO(r.firstVoteTime) : null,
+      lastVoteTime: r.lastVoteTime ? formatToISO(r.lastVoteTime) : null
+    }));
+
+    // 添加時間戳防止緩存
+    res.set('X-Query-Timestamp', Date.now().toString());
+    res.json(formatted);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -78,6 +137,12 @@ router.get('/votes/:voteId', async (req, res) => {
     vote.voteOptions = options.map(opt => opt.optionText);
     vote.optionDetails = options;
 
+    // Format date/time fields to ISO format without timezone assumption
+    vote.startTime = formatToISO(vote.startTime)
+    vote.endTime = formatToISO(vote.endTime)
+    vote.createdAt = formatToISO(vote.createdAt)
+    vote.updatedAt = vote.updatedAt ? formatToISO(vote.updatedAt) : null
+
     // 查詢參與者
     const [participants] = await pool.query(
       'SELECT DISTINCT userId FROM VoteParticipants WHERE voteId = ?',
@@ -86,6 +151,8 @@ router.get('/votes/:voteId', async (req, res) => {
 
     vote.participants = participants.map(p => p.userId);
 
+    // 添加時間戳防止緩存
+    res.set('X-Query-Timestamp', Date.now().toString())
     res.json(vote);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -305,49 +372,90 @@ router.delete('/votes/:voteId', async (req, res) => {
 router.post('/votes/submit', async (req, res) => {
   const { voteId, selectedOptions, userId, anonymous, votedAt } = req.body;
 
+  console.log('[POST /votes/submit] Request:', { voteId, userId, selectedOptions, anonymous, votedAt });
+
   if (!voteId || !selectedOptions || !userId) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
+  const connection = await pool.getConnection();
+  
   try {
-    // 檢查用戶是否已經投票過
-    const [existingVote] = await pool.query(
-      'SELECT COUNT(*) as voteCount FROM VoteRecords WHERE voteId = ? AND userId = ?',
+    await connection.beginTransaction();
+    
+    // 檢查用戶是否已經投票過（使用 VoteParticipants 表）
+    const [existingVote] = await connection.query(
+      'SELECT COUNT(*) as voteCount FROM VoteParticipants WHERE voteId = ? AND userId = ?',
       [voteId, userId]
     );
 
+    console.log('[POST /votes/submit] Existing vote count:', existingVote[0].voteCount);
+
     if (existingVote[0].voteCount > 0) {
+      await connection.rollback();
+      console.log('[POST /votes/submit] User already voted, returning 400');
       return res.status(400).json({ error: 'User has already voted' });
     }
 
-    const now = new Date(votedAt || Date.now());
+    // 確保選項陣列有效
+    if (!Array.isArray(selectedOptions) || selectedOptions.length === 0) {
+      await connection.rollback();
+      return res.status(400).json({ error: 'Invalid options' });
+    }
 
-    // 記錄投票
-    for (const optionId of selectedOptions) {
-      const voteRecordId = `VREC_${voteId}_${userId}_${Date.now()}`;
-      await pool.query(
+    const now = new Date(votedAt || Date.now());
+    const timestamp = Date.now();
+
+    // 記錄投票 - 無論是否匿名，都要保存 userId 以便追蹤
+    for (let i = 0; i < selectedOptions.length; i++) {
+      const optionId = selectedOptions[i];
+      
+      // 驗證 optionId 是否存在
+      const [optionCheck] = await connection.query(
+        'SELECT optionId FROM VoteOptions WHERE optionId = ? AND voteId = ?',
+        [optionId, voteId]
+      );
+      
+      if (optionCheck.length === 0) {
+        await connection.rollback();
+        return res.status(400).json({ error: `Invalid option: ${optionId}` });
+      }
+      
+      // 使用 timestamp 和 index 確保每個 voteRecordId 唯一
+      const voteRecordId = `VREC_${voteId}_${userId}_${timestamp}_${i}`;
+      await connection.query(
         'INSERT INTO VoteRecords (voteRecordId, voteId, optionId, userId, votedAt) VALUES (?, ?, ?, ?, ?)',
-        [voteRecordId, voteId, optionId, anonymous ? null : userId, formatDateTimeForMySQL(now)]
+        [voteRecordId, voteId, optionId, userId, formatDateTimeForMySQL(now)]
       );
 
       // 更新投票計數
-      await pool.query(
+      await connection.query(
         'UPDATE VoteOptions SET voteCount = voteCount + 1 WHERE optionId = ?',
         [optionId]
       );
     }
 
     // 記錄參與者
-    const participantId = `PART_${voteId}_${userId}`;
-    await pool.query(
+    const participantId = `PART_${voteId}_${userId}_${timestamp}`;
+    await connection.query(
       'INSERT INTO VoteParticipants (participantId, voteId, userId, votedAt) VALUES (?, ?, ?, ?)',
       [participantId, voteId, userId, formatDateTimeForMySQL(now)]
     );
 
+    console.log('[POST /votes/submit] Vote submitted successfully, participantId:', participantId);
+
+    await connection.commit();
     res.status(201).json({ message: 'Vote submitted successfully' });
   } catch (err) {
+    try {
+      await connection.rollback();
+    } catch (rollbackErr) {
+      console.error('[POST /votes/submit] Rollback error:', rollbackErr);
+    }
     console.error('[POST /votes/submit]', err);
     res.status(500).json({ error: err.message });
+  } finally {
+    connection.release();
   }
 });
 
@@ -359,17 +467,24 @@ router.get('/votes/:voteId/check-voted', async (req, res) => {
   const { voteId } = req.params;
   const { userId } = req.query;
 
+  console.log('[GET /votes/:voteId/check-voted] Request:', { voteId, userId });
+
   if (!voteId || !userId) {
     return res.status(400).json({ error: 'Missing required parameters' });
   }
 
   try {
+    // 使用 VoteParticipants 表檢查（該表有 UNIQUE KEY 保證數據一致性）
     const [result] = await pool.query(
-      'SELECT COUNT(*) as voteCount FROM VoteRecords WHERE voteId = ? AND userId = ?',
+      'SELECT COUNT(*) as voteCount FROM VoteParticipants WHERE voteId = ? AND userId = ?',
       [voteId, userId]
     );
 
     const hasVoted = result[0].voteCount > 0;
+    console.log('[GET /votes/:voteId/check-voted] Result:', { hasVoted, voteCount: result[0].voteCount });
+    
+    // 添加時間戳防止緩存
+    res.set('X-Query-Timestamp', Date.now().toString())
     res.json({ hasVoted });
   } catch (err) {
     console.error('[GET /votes/:voteId/check-voted]', err);
@@ -383,6 +498,8 @@ router.get('/votes/:voteId/check-voted', async (req, res) => {
  */
 router.get('/votes/:voteId/results', async (req, res) => {
   const { voteId } = req.params;
+
+  console.log('[GET /votes/:voteId/results] Request for voteId:', voteId);
 
   if (!voteId) {
     return res.status(400).json({ error: 'voteId required' });
@@ -405,10 +522,24 @@ router.get('/votes/:voteId/results', async (req, res) => {
     );
 
     // 獲取投票統計
-    const [stats] = await pool.query(
-      'SELECT COUNT(DISTINCT userId) as totalParticipants, COUNT(*) as totalVotes FROM VoteParticipants WHERE voteId = ?',
+    // totalParticipants: 參與的不重複用戶數（從 VoteParticipants 表）
+    // totalVotes: 總投票記錄數（從 VoteRecords 表，一個用戶可能投多個選項）
+    const [participantStats] = await pool.query(
+      'SELECT COUNT(DISTINCT userId) as totalParticipants FROM VoteParticipants WHERE voteId = ?',
       [voteId]
     );
+    
+    const [voteStats] = await pool.query(
+      'SELECT COUNT(*) as totalVotes FROM VoteRecords WHERE voteId = ?',
+      [voteId]
+    );
+    
+    const stats = {
+      totalParticipants: participantStats[0].totalParticipants,
+      totalVotes: voteStats[0].totalVotes
+    };
+    
+    console.log('[GET /votes/:voteId/results] Stats for', voteId, ':', stats);
 
     // 獲取投票者清單（如果不是匿名投票）
     let votersList = [];
@@ -428,16 +559,82 @@ router.get('/votes/:voteId/results', async (req, res) => {
       votersList = voters;
     }
 
+    // Format voter timestamps
+    votersList = votersList.map(v => ({
+      ...v,
+      votedAt: v.votedAt ? formatToISO(v.votedAt) : null
+    }))
+
+    // 添加時間戳防止緩存
+    res.set('X-Query-Timestamp', Date.now().toString())
     res.json({
       voteId,
       optionDetails: options,
-      totalVotes: stats[0].totalVotes,
-      totalParticipants: stats[0].totalParticipants,
+      totalVotes: stats.totalVotes,
+      totalParticipants: stats.totalParticipants,
       votersList
     });
   } catch (err) {
     console.error('[GET /votes/:voteId/results]', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * 清理用戶在特定投票中的記錄（用於修復數據不一致）
+ * DELETE /api/votes/:voteId/user/:userId
+ * 需要管理員權限
+ */
+router.delete('/votes/:voteId/user/:userId', async (req, res) => {
+  const { voteId, userId } = req.params;
+
+  if (!voteId || !userId) {
+    return res.status(400).json({ error: 'Missing required parameters' });
+  }
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // 取得該用戶在該投票中的所有選項
+    const [voteRecords] = await connection.query(
+      'SELECT DISTINCT optionId FROM VoteRecords WHERE voteId = ? AND userId = ?',
+      [voteId, userId]
+    );
+
+    // 刪除投票記錄
+    await connection.query(
+      'DELETE FROM VoteRecords WHERE voteId = ? AND userId = ?',
+      [voteId, userId]
+    );
+
+    // 刪除參與者記錄
+    await connection.query(
+      'DELETE FROM VoteParticipants WHERE voteId = ? AND userId = ?',
+      [voteId, userId]
+    );
+
+    // 更新受影響選項的投票計數
+    for (const record of voteRecords) {
+      await connection.query(
+        'UPDATE VoteOptions SET voteCount = GREATEST(0, voteCount - 1) WHERE optionId = ?',
+        [record.optionId]
+      );
+    }
+
+    await connection.commit();
+    res.json({ message: 'User vote record deleted successfully', recordsDeleted: voteRecords.length });
+  } catch (err) {
+    try {
+      await connection.rollback();
+    } catch (rollbackErr) {
+      console.error('[DELETE /votes/:voteId/user/:userId] Rollback error:', rollbackErr);
+    }
+    console.error('[DELETE /votes/:voteId/user/:userId]', err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    connection.release();
   }
 });
 

@@ -56,9 +56,11 @@
         color="primary"
         variant="elevated"
         size="small"
+        :disabled="isLoading"
+        :loading="isLoading"
         @click="$emit('vote', vote)"
       >
-        {{ t('vote.vote') }}
+        {{ isLoading ? t('common.loading') : t('vote.vote') }}
       </v-btn>
       <v-btn
         v-else-if="hasVoted"
@@ -83,8 +85,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatDateTime, deriveEffectiveStatus } from '@/utils/time'
 
 const { t } = useI18n()
 
@@ -96,31 +99,53 @@ const props = defineProps({
   hasVoted: {
     type: Boolean,
     default: false
+  },
+  isLoading: {
+    type: Boolean,
+    default: false
   }
 })
 
 defineEmits(['vote', 'view-results'])
 
+// 監視 props 變化以調試
+watch(() => props.hasVoted, (newVal, oldVal) => {
+  console.log(`[VoteCard ${props.vote.voteId}] hasVoted changed: ${oldVal} => ${newVal}`)
+})
+
+watch(() => props.isLoading, (newVal, oldVal) => {
+  console.log(`[VoteCard ${props.vote.voteId}] isLoading changed: ${oldVal} => ${newVal}`)
+})
+
 // Computed
+""
+
+const effectiveStatus = computed(() => {
+  return deriveEffectiveStatus(props.vote.voteStatus, props.vote.startTime, props.vote.endTime)
+})
+
 const statusColor = computed(() => {
-  const status = props.vote.voteStatus
   const colorMap = {
-    'Draft': 'grey',
-    'Active': 'blue',
-    'Closed': 'orange',
-    'Cancelled': 'red'
+    'draft.unpublished': 'grey',
+    'draft.pending': 'info',
+    'notStarted': 'blue',
+    'inProgress': 'success',
+    'ended': 'orange',
+    'cancelled': 'red'
   }
-  return colorMap[status] || 'grey'
+  return colorMap[effectiveStatus.value] || 'grey'
 })
 
 const statusLabel = computed(() => {
   const statusMap = {
-    'Draft': t('vote.statusDraft'),
-    'Active': t('vote.statusActive'),
-    'Closed': t('vote.statusClosed'),
-    'Cancelled': t('vote.statusCancelled')
+    'draft.unpublished': t('vote.statusDraftUnpublished'),
+    'draft.pending': t('vote.statusDraftPending'),
+    'notStarted': t('vote.notStarted'),
+    'inProgress': t('vote.statusActive'),
+    'ended': t('vote.statusClosed'),
+    'cancelled': t('vote.statusCancelled')
   }
-  return statusMap[props.vote.voteStatus] || ''
+  return statusMap[effectiveStatus.value] || ''
 })
 
 const voteTypeLabel = computed(() => {
@@ -133,23 +158,11 @@ const voteTypeLabel = computed(() => {
 })
 
 const isVotingAvailable = computed(() => {
-  const now = new Date()
-  const startTime = new Date(props.vote.startTime)
-  const endTime = new Date(props.vote.endTime)
-  return props.vote.voteStatus === 'Active' && now >= startTime && now <= endTime
+  return effectiveStatus.value === 'inProgress'
 })
 
 // 方法
-const formatDateTime = (dateTime) => {
-  const date = new Date(dateTime)
-  return date.toLocaleString('zh-TW', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
+// 使用共用的 formatDateTime（已 import）
 
 const truncateText = (text, maxLength) => {
   if (text.length > maxLength) {

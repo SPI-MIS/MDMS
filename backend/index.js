@@ -6,6 +6,25 @@ const router = express.Router()
 app.use(cors())
 app.use(express.json())
 
+// 防緩存中間件 - 為所有 API 響應添加時間戳和緩存禁用頭
+app.use('/api', (req, res, next) => {
+  // 添加時間戳以防止緩存
+  res.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'X-Timestamp': new Date().toISOString(),
+    'X-Request-Time': Date.now().toString()
+  })
+  
+  // 在查詢參數中添加時間戳（如果還沒有）
+  if (!req.query._t) {
+    req.query._t = Date.now()
+  }
+  
+  next()
+})
+
 app.use('/api', require('./routes/login'))
 
 app.use('/api', require('./routes/user'))

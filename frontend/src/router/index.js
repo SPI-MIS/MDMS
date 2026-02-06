@@ -92,7 +92,10 @@ const routes = [
     path: '/manage',
     name: 'manage',
     component: ManageView,
-    meta: { title: 'manage.home' }
+    meta: { 
+      title: 'manage.home',
+      role: 'managerOnly' 
+    }
   },
   { 
     path: '/ChangePassword', 
@@ -116,7 +119,7 @@ const routes = [
     meta: {
       title: 'vote.manageVotingActivities',
       requiresAuth: true,
-      role: 'admin'
+      role: 'manager'
     }
   },
   {
@@ -131,7 +134,7 @@ const routes = [
     meta: {
       title: 'vote.adminPanel',
       requiresAuth: true,
-      role: 'admin' // 如果需要權限控制
+      role: 'manager'
     }
   },
   {
@@ -141,13 +144,17 @@ const routes = [
     meta: {
       title: 'vote.manageVotingActivities',
       requiresAuth: true,
-      role: 'admin'
+      role: 'manager'
     }
   },
   {
-    path: '/vote-it-management',
+    path: '/vote-itmanagement',
     component: VoteITManagementView,
-    meta: { title: 'itManagementPanel' }
+    meta: {
+      title: 'manage.itvotemanage',
+      requiresAuth: true,
+      role: 'managerOnly'
+    }
   },
   { 
     path: '/exclusionhome', 
@@ -165,7 +172,7 @@ const router = createRouter({
 const publicPages = ['/login', '/tool_excelimport', '/QAtool']
 
 router.beforeEach((to, from, next) => {
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, admin, manager } = useAuth()
 
   const requiresAuth = !publicPages.includes(to.path)
 
@@ -176,10 +183,37 @@ router.beforeEach((to, from, next) => {
 
   // 🔁 2) 已登入 → 不允許回到 login
   if (to.path === '/login' && isLoggedIn.value) {
-    return next('/mdmshome')
+    return next('/')
   }
 
-  // 🌐 3) 自動依語系更新 title
+  // 🔐 3) 角色權限檢查
+  if (to.meta?.role) {
+    const requiredRole = to.meta.role
+    let hasPermission = false
+
+    // 調試日誌
+    console.log('[Router Guard] Checking permissions:', {
+      path: to.path,
+      requiredRole,
+      admin: admin.value,
+      manager: manager.value
+    })
+
+    if (requiredRole === 'admin') { hasPermission = admin.value === '1'} 
+    else if (requiredRole === 'manager') { hasPermission = manager.value === '1' || admin.value === '1' } 
+    else if (requiredRole === 'managerOnly') { hasPermission = manager.value === '1' && admin.value !== '1' }
+
+    console.log('[Router Guard] Has permission:', hasPermission)
+
+    if (!hasPermission) {
+      console.warn(`User does not have ${requiredRole} permission for route: ${to.path}`)
+      // 重定向到首頁並顯示無權限訊息
+      // alert(i18n.global.t('common.noPermission') || '您沒有權限訪問此頁面')
+      return next('/')
+    }
+  }
+
+  // 🌐 4) 自動依語系更新 title
   if (to.meta?.title) {
     document.title = i18n.global.t(to.meta.title)
   }
