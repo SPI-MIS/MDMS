@@ -80,6 +80,7 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuth } from '@/composables/useAuth'
+import { formatDateTimeForSubmit } from '@/utils/time'
 
 const { t } = useI18n()
 const { userId } = useAuth()
@@ -147,7 +148,7 @@ const onSubmit = async () => {
         : [selectedOption.value],
       userId: userId.value,
       anonymous: props.vote.allowAnonymous,
-      votedAt: new Date().toISOString()
+      votedAt: formatDateTimeForSubmit(new Date())
     }
 
     emit('submit', voteData)

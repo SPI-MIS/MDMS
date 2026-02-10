@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/db_votes');
-const { formatToISO } = require('../utils/time')
+const { formatToISO, DEFAULT_TZ_OFFSET } = require('../utils/time')
 
 /**
  * 將 ISO 8601 日期轉換為 MySQL DATETIME 格式 (YYYY-MM-DD HH:MM:SS)
@@ -20,6 +20,77 @@ function formatDateTimeForMySQL(dateValue) {
   const seconds = String(date.getSeconds()).padStart(2, '0');
 
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function parseOffsetMinutes(offset) {
+  if (!offset) return 0;
+  const normalized = offset.replace(':', '');
+  const m = normalized.match(/^([+-])(\d{2})(\d{2})$/);
+  if (!m) return 0;
+  const sign = m[1] === '-' ? -1 : 1;
+  return sign * (parseInt(m[2], 10) * 60 + parseInt(m[3], 10));
+}
+
+function formatLocalDateTime(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function formatUtcDateTime(date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+function formatDateTimeForMySQLWallTime(dateValue, targetOffset = DEFAULT_TZ_OFFSET) {
+  if (!dateValue) return null;
+
+  if (dateValue instanceof Date) {
+    return formatLocalDateTime(dateValue);
+  }
+
+  if (typeof dateValue === 'number') {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return null;
+    return formatLocalDateTime(date);
+  }
+
+  if (typeof dateValue !== 'string') return null;
+
+  const s = dateValue.trim();
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?)?(Z|[+-]\d{2}:?\d{2})?$/);
+  if (!m) {
+    const date = new Date(s);
+    if (isNaN(date.getTime())) return null;
+    return formatLocalDateTime(date);
+  }
+
+  const year = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10) - 1;
+  const day = parseInt(m[3], 10);
+  const hours = parseInt(m[4] || '0', 10);
+  const minutes = parseInt(m[5] || '0', 10);
+  const seconds = parseInt(m[6] || '0', 10);
+  const inputOffsetRaw = m[7];
+
+  if (!inputOffsetRaw) {
+    return `${m[1]}-${m[2]}-${m[3]} ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  const inputOffsetMinutes = inputOffsetRaw === 'Z' ? 0 : parseOffsetMinutes(inputOffsetRaw);
+  const targetOffsetMinutes = parseOffsetMinutes(targetOffset);
+  const utcMillis = Date.UTC(year, month, day, hours, minutes, seconds) - inputOffsetMinutes * 60 * 1000;
+  const targetMillis = utcMillis + targetOffsetMinutes * 60 * 1000;
+  return formatUtcDateTime(new Date(targetMillis));
 }
 
 /**
@@ -403,7 +474,8 @@ router.post('/votes/submit', async (req, res) => {
       return res.status(400).json({ error: 'Invalid options' });
     }
 
-    const now = new Date(votedAt || Date.now());
+    const voteTimeValue = votedAt || Date.now();
+    const formattedVotedAt = formatDateTimeForMySQLWallTime(voteTimeValue);
     const timestamp = Date.now();
 
     // 記錄投票 - 無論是否匿名，都要保存 userId 以便追蹤
@@ -425,7 +497,7 @@ router.post('/votes/submit', async (req, res) => {
       const voteRecordId = `VREC_${voteId}_${userId}_${timestamp}_${i}`;
       await connection.query(
         'INSERT INTO VoteRecords (voteRecordId, voteId, optionId, userId, votedAt) VALUES (?, ?, ?, ?, ?)',
-        [voteRecordId, voteId, optionId, userId, formatDateTimeForMySQL(now)]
+        [voteRecordId, voteId, optionId, userId, formattedVotedAt]
       );
 
       // 更新投票計數
@@ -439,7 +511,7 @@ router.post('/votes/submit', async (req, res) => {
     const participantId = `PART_${voteId}_${userId}_${timestamp}`;
     await connection.query(
       'INSERT INTO VoteParticipants (participantId, voteId, userId, votedAt) VALUES (?, ?, ?, ?)',
-      [participantId, voteId, userId, formatDateTimeForMySQL(now)]
+      [participantId, voteId, userId, formattedVotedAt]
     );
 
     console.log('[POST /votes/submit] Vote submitted successfully, participantId:', participantId);

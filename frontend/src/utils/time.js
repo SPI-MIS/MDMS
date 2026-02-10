@@ -88,6 +88,29 @@ export function formatDateTime(dateTime, locale = 'zh-TW', opts = {}) {
   return formatter.format(d)
 }
 
+export function formatDateTimeForSubmit(dateValue = new Date(), timeZone = DEFAULT_TIMEZONE) {
+  const d = dateValue instanceof Date ? dateValue : new Date(dateValue)
+  if (isNaN(d.getTime())) return ''
+
+  const formatter = new Intl.DateTimeFormat('sv-SE', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZone
+  })
+
+  const parts = {}
+  formatter.formatToParts(d).forEach(part => {
+    parts[part.type] = part.value
+  })
+
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`
+}
+
 export function deriveEffectiveStatus(status, startTime, endTime) {
   // Return values (tokens):
   // 'draft.unpublished' -> 草稿但尚未到開始時間（未發布（草稿））
