@@ -133,6 +133,9 @@
             <v-combobox
               v-model="form.participants"
               :label="t('vote.participants')"
+              :items="participantItems"
+              item-title="title"
+              item-value="value"
               multiple
               chips
               :readonly="!isNew && form.voteStatus !== 'Draft'"
@@ -244,7 +247,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useVoteStore } from '@/stores/vote'
@@ -259,6 +262,8 @@ const { userId, userName } = useAuth()
 const isNew = ref(true)
 const searchDialog = ref(false)
 const searchKeyword = ref('')
+const ALL_COMPANY_VALUE = '__ALL_COMPANY__'
+const participantItems = ref([])
 
 const form = reactive({
   voteId: '',
@@ -320,6 +325,14 @@ const statusItems = computed(() => [
   { value: 'Cancelled', title: t('vote.statusCancelled') }
 ])
 
+const normalizeParticipants = (value = []) => {
+  if (!Array.isArray(value)) return []
+  if (value.includes(ALL_COMPANY_VALUE)) {
+    return [ALL_COMPANY_VALUE]
+  }
+  return [...new Set(value.filter(Boolean))]
+}
+
 const resetForm = () => {
   form.voteId = ''
   form.activityName = ''
@@ -356,6 +369,7 @@ const onSave = async () => {
     // 將用戶輸入的時間轉換為 ISO 格式（台北時區）
     const saveData = {
       ...form,
+      participants: normalizeParticipants(form.participants),
       startTime: parseUserTimeInput(form.startTime),
       endTime: parseUserTimeInput(form.endTime),
       ...(isNew.value ? { createdBy: userId.value || userName.value || 'SYSTEM' } : { updatedBy: userId.value || userName.value || 'SYSTEM' })
@@ -433,7 +447,40 @@ const focusEndTime = () => {
 
 const formatDateDisplay = (dateStr) => formatDateTime(dateStr)
 
+watch(
+  () => form.participants,
+  (newValue) => {
+    const normalized = normalizeParticipants(newValue)
+    if (JSON.stringify(normalized) !== JSON.stringify(newValue)) {
+      form.participants = normalized
+    }
+  },
+  { deep: true }
+)
+
 onMounted(async () => {
+  try {
+    const participantData = await voteStore.fetchParticipantDepartments()
+    const allCompanyOption = participantData?.allCompany
+      ? [{
+          value: participantData.allCompany.value || ALL_COMPANY_VALUE,
+          title: `${participantData.allCompany.title} (${participantData.allCompany.activeUsers || 0})`
+        }]
+      : []
+
+    const departmentOptions = Array.isArray(participantData?.departments)
+      ? participantData.departments.map((item) => ({
+          value: item.value,
+          title: `${item.title} (${item.activeUsers || 0})`
+        }))
+      : []
+
+    participantItems.value = [...allCompanyOption, ...departmentOptions]
+  } catch (error) {
+    console.error('Error loading participant departments:', error)
+    participantItems.value = []
+  }
+
   const voteId = router.currentRoute.value.params.id
   
   if (voteId) {
@@ -462,7 +509,7 @@ onMounted(async () => {
       }
       
       if (vote.participants && Array.isArray(vote.participants)) {
-        form.participants = vote.participants
+        form.participants = normalizeParticipants(vote.participants)
       }
       
       isNew.value = false

@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/db_votes');
+const { getPool } = require('../db/db_SPI');
 const { formatToISO, DEFAULT_TZ_OFFSET } = require('../utils/time')
+
+const ALL_COMPANY_VALUE = '__ALL_COMPANY__';
 
 /**
  * 將 ISO 8601 日期轉換為 MySQL DATETIME 格式 (YYYY-MM-DD HH:MM:SS)
@@ -175,6 +178,70 @@ router.get('/votes/user-stats', async (req, res) => {
     res.set('X-Query-Timestamp', Date.now().toString());
     res.json(formatted);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+/**
+ * 查詢投票參與對象（部門）
+ * GET /api/votes/participant-departments
+ */
+router.get('/votes/participant-departments', async (req, res) => {
+  try {
+    const spiPool = await getPool();
+
+    const activeUsersResult = await spiPool.request().query(`
+      SELECT
+        MV004 AS department,
+        SUM(CASE WHEN ISNULL(MV002, '') <> '' THEN 1 ELSE 0 END) AS activeUsers
+      FROM [SPI_20191231].[dbo].[CMSMV]
+      WHERE MV004 IS NOT NULL AND MV004 <> '' AND MV022 = ''
+      GROUP BY MV004, MV022
+      ORDER BY department ASC
+    `);
+
+    const departmentNameResult = await spiPool.request().query(`
+      SELECT
+        ME001 AS department,
+        ME002 AS departmentName
+      FROM [SPI_20191231].[dbo].[CMSME]
+    `);
+
+    const totalUsersResult = await spiPool.request().query(`
+      SELECT COUNT(*) AS totalUsers
+      FROM [SPI_20191231].[dbo].[CMSMV]
+      WHERE MV022 = ''
+    `);
+
+    const departmentNameMap = new Map(
+      departmentNameResult.recordset.map((item) => [item.department, item.departmentName])
+    );
+
+    const departments = activeUsersResult.recordset.map((item) => {
+      const departmentCode = item.department;
+      const departmentName = departmentNameMap.get(departmentCode) || departmentCode;
+      return {
+        value: departmentCode,
+        title: `${departmentName}(${departmentCode})`,
+        department: departmentCode,
+        departmentName,
+        activeUsers: item.activeUsers || 0
+      };
+    });
+
+    const totalUsers = totalUsersResult.recordset?.[0]?.totalUsers || 0;
+
+    res.json({
+      allCompany: {
+        value: ALL_COMPANY_VALUE,
+        title: '全公司',
+        activeUsers: totalUsers
+      },
+      departments
+    });
+  } catch (err) {
+    console.error('[GET /votes/participant-departments]', err);
     res.status(500).json({ error: err.message });
   }
 });
