@@ -142,6 +142,24 @@ export const useVoteStore = defineStore('vote', () => {
     }
   }
 
+
+  // 方法：查詢投票參與對象（部門）
+  const fetchParticipantDepartments = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await fetch('/api/votes/participant-departments')
+      if (!response.ok) throw new Error('Failed to fetch participant departments')
+      return await response.json()
+    } catch (err) {
+      error.value = err.message
+      console.error('Error fetching participant departments:', err)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   // 方法：提交投票（員工）
   const submitVote = async (voteData) => {
     loading.value = true
@@ -269,6 +287,7 @@ export const useVoteStore = defineStore('vote', () => {
     createVote,
     updateVote,
     deleteVote,
+    fetchParticipantDepartments,
     submitVote,
     checkUserVoted,
     fetchVoteResults,
