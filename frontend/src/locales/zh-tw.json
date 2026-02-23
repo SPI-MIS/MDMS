@@ -20,7 +20,8 @@
   },
   "order": {
     "home": "訂便當首頁",
-    "settings": "訂便當資料管理"
+    "settings": "訂便當資料查詢",
+    "creatdata": "進行便當訂購"
   },
   "mdms": {
     "home": "模具管理首頁",
@@ -100,6 +101,7 @@
     "options": "投票選項",
     "option": "選項",
     "addOption": "新增選項",
+    "system": "投票狀態儀表板",
     "status": "狀態",
     "statusDraft": "草稿",
     "statusDraftUnpublished": "未發佈（草稿）",
@@ -143,7 +145,9 @@
     "votes": "票",
     "voteStatistics": "投票統計",
     "totalVotes": "已建立活動",
-    "totalParticipants": "已參與人數",
+    "total": "總投票數",
+    "denominator":"應參與人數",
+    "molecular": "已參與人數",
     "participationRate": "參與率",
     "optionStatistics": "選項統計",
     "optionText": "選項文字",

@@ -1,7 +1,11 @@
+
 const express = require('express');
 const router = express.Router();
 const pool = require('../db/db_votes');
+const { getPool } = require('../db/db_SPI');
 const { formatToISO, DEFAULT_TZ_OFFSET } = require('../utils/time')
+
+const ALL_COMPANY_VALUE = '__ALL_COMPANY__';
 
 /**
  * 將 ISO 8601 日期轉換為 MySQL DATETIME 格式 (YYYY-MM-DD HH:MM:SS)
@@ -106,7 +110,8 @@ router.get('/votes', async (req, res) => {
         v.activityName, 
         v.activityCode, 
         v.voteTitle, 
-        v.voteStatus, 
+        v.voteStatus,
+        v.votetotal, 
         v.startTime, 
         v.endTime, 
         v.createdAt, 
@@ -180,6 +185,62 @@ router.get('/votes/user-stats', async (req, res) => {
 });
 
 /**
+ * 查詢投票參與對象（部門）
+ * GET /api/votes/participant-departments
+ */
+router.get('/votes/participant-departments', async (req, res) => {
+  try {
+    const spiPool = await getPool();
+    
+    // 合併查詢：一次取得部門代號、名稱和活躍用戶數
+    const departmentsResult = await spiPool.request().query(`
+      SELECT 
+        mv.MV004 AS department,
+        me.ME002 AS departmentName,
+        SUM(CASE WHEN ISNULL(mv.MV002, '') <> '' THEN 1 ELSE 0 END) AS activeUsers
+      FROM [SPI_20191231].[dbo].[CMSMV] mv
+      INNER JOIN [SPI_20191231].[dbo].[CMSME] me ON mv.MV004 = me.ME001
+      WHERE mv.MV004 IS NOT NULL 
+        AND mv.MV004 <> '' AND MV004 NOT IN ('1000','2000')
+        AND mv.MV022 = '' AND mv.MV021 != ''
+      GROUP BY mv.MV004, me.ME002
+      ORDER BY mv.MV004 ASC
+    `);
+
+    // 查詢總用戶數
+    const totalUsersResult = await spiPool.request().query(`
+      SELECT COUNT(*) AS totalUsers
+      FROM [SPI_20191231].[dbo].[CMSMV]
+      WHERE MV022 = '' AND MV021 != '' AND MV004 NOT IN ('1000','2000')
+    `);
+
+    // 組裝部門資料
+    const departments = departmentsResult.recordset.map((item) => ({
+      value: item.department,
+      title: `${item.departmentName}(${item.department})`,
+      department: item.department,
+      departmentName: item.departmentName,
+      activeUsers: item.activeUsers || 0
+    }));
+
+    const totalUsers = totalUsersResult.recordset?.[0]?.totalUsers || 0;
+
+    res.json({
+      allCompany: {
+        value: ALL_COMPANY_VALUE,
+        title: '全公司',
+        activeUsers: totalUsers
+      },
+      departments
+    });
+  } catch (err) {
+    console.error('[GET /votes/participant-departments]', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+/**
  * 查詢單個投票詳情
  * GET /api/votes/:voteId
  */
@@ -246,7 +307,7 @@ router.post('/votes', async (req, res) => {
     endTime, 
     allowAnonymous, 
     resultsPublic, 
-    participants, 
+    participants, // 這裡是選取的部門陣列，例如 ['2300', '2400', 'ALL_COMPANY']
     voteOptions,
     createdBy
   } = req.body;
@@ -260,12 +321,72 @@ router.post('/votes', async (req, res) => {
     const voteId = `VOTE_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date();
 
-    // 插入投票主記錄
+        // 處理參與部門和計算總人數
+    let participantDepartments = '';
+    let totalParticipants = 0;
+
+    if (participants && participants.length > 0) {
+      // 修正：提取部門代碼（處理物件陣列的情況）
+      const departmentCodes = participants.map(p => {
+        // 如果是物件，取 value 或 department 屬性
+        if (typeof p === 'object') {
+          return p.value || p.department || p;
+        }
+        // 如果是字串，直接使用
+        return p;
+      });
+
+      // 將部門陣列轉為逗號分隔字串
+      participantDepartments = departmentCodes.join(',');
+
+      // 計算總人數
+      const spiPool = await getPool();
+      
+      // 如果包含 ALL_COMPANY，直接查詢全公司人數
+      if (departmentCodes.includes('ALL_COMPANY')) {
+        const result = await spiPool.request().query(`
+          SELECT COUNT(*) AS totalUsers
+          FROM [SPI_20191231].[dbo].[CMSMV]
+          WHERE MV022 = '' AND MV021 != '' AND MV004 NOT IN ('1000','2000')
+        `);
+        totalParticipants = result.recordset[0]?.totalUsers || 0;
+      } else {
+        // 查詢特定部門的人數
+        const departmentList = departmentCodes.map(d => `'${d}'`).join(',');
+        const result = await spiPool.request().query(`
+          SELECT COUNT(*) AS totalUsers
+          FROM [SPI_20191231].[dbo].[CMSMV]
+          WHERE MV004 IN (${departmentList}) AND MV022 = '' AND MV021 != ''
+        `);
+        totalParticipants = result.recordset[0]?.totalUsers || 0;
+      }
+    }
+
+    // 插入投票主記錄（包含部門和總人數）
     await pool.query(
       `INSERT INTO Votes 
-        (voteId, activityName, activityCode, voteTitle, voteDescription, voteType, allowMultiple, startTime, endTime, allowAnonymous, resultsPublic, voteStatus, createdBy, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [voteId, activityName, activityCode || null, voteTitle, voteDescription || null, voteType || 'general', allowMultiple ? 1 : 0, formatDateTimeForMySQL(startTime), formatDateTimeForMySQL(endTime), allowAnonymous ? 1 : 0, resultsPublic ? 1 : 0, 'Draft', createdBy || 'system', formatDateTimeForMySQL(now)]
+        (voteId, activityName, activityCode, voteTitle, voteDescription, voteType, 
+         allowMultiple, startTime, endTime, allowAnonymous, resultsPublic, 
+         participantDepartments, votetotal, voteStatus, createdBy, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        voteId, 
+        activityName, 
+        activityCode || null, 
+        voteTitle, 
+        voteDescription || null, 
+        voteType || 'general', 
+        allowMultiple ? 1 : 0, 
+        formatDateTimeForMySQL(startTime), 
+        formatDateTimeForMySQL(endTime), 
+        allowAnonymous ? 1 : 0, 
+        resultsPublic ? 1 : 0, 
+        participantDepartments, // 存儲部門列表，例如 '2300,2400,2500'
+        totalParticipants, // 存儲總人數
+        'Draft', 
+        createdBy || 'system', 
+        formatDateTimeForMySQL(now)
+      ]
     );
 
     // 插入投票選項
@@ -281,20 +402,11 @@ router.post('/votes', async (req, res) => {
       }
     }
 
-    // 插入參與者
-    if (participants && participants.length > 0) {
-      for (const userId of participants) {
-        const participantId = `PART_${voteId}_${userId}`;
-        await pool.query(
-          'INSERT INTO VoteParticipants (participantId, voteId, userId) VALUES (?, ?, ?)',
-          [participantId, voteId, userId]
-        );
-      }
-    }
-
     res.status(201).json({ 
       voteId, 
-      message: 'Vote created successfully' 
+      message: 'Vote created successfully',
+      participantDepartments,
+      totalParticipants
     });
   } catch (err) {
     console.error('[POST /votes]', err);
@@ -319,7 +431,7 @@ router.put('/votes/:voteId', async (req, res) => {
     endTime, 
     allowAnonymous, 
     resultsPublic, 
-    participants, 
+    participants, // 選取的部門陣列
     voteOptions,
     voteStatus,
     updatedBy
@@ -344,6 +456,47 @@ router.put('/votes/:voteId', async (req, res) => {
 
     const now = new Date();
 
+    // 處理參與部門和計算總人數
+    let participantDepartments = '';
+    let totalParticipants = 0;
+
+    if (participants && participants.length > 0) {
+      // 修正：提取部門代碼（處理物件陣列的情況）
+      const departmentCodes = participants.map(p => {
+        // 如果是物件，取 value 或 department 屬性
+        if (typeof p === 'object') {
+          return p.value || p.department || p;
+        }
+        // 如果是字串，直接使用
+        return p;
+      });
+
+      // 將部門陣列轉為逗號分隔字串
+      participantDepartments = departmentCodes.join(',');
+
+      // 計算總人數
+      const spiPool = await getPool();
+      
+      // 如果包含 ALL_COMPANY，直接查詢全公司人數
+      if (departmentCodes.includes('ALL_COMPANY')) {
+        const result = await spiPool.request().query(`
+          SELECT COUNT(*) AS totalUsers
+          FROM [SPI_20191231].[dbo].[CMSMV]
+          WHERE MV022 = '' AND MV021 != ''
+        `);
+        totalParticipants = result.recordset[0]?.totalUsers || 0;
+      } else {
+        // 查詢特定部門的人數
+        const departmentList = departmentCodes.map(d => `'${d}'`).join(',');
+        const result = await spiPool.request().query(`
+          SELECT COUNT(*) AS totalUsers
+          FROM [SPI_20191231].[dbo].[CMSMV]
+          WHERE MV004 IN (${departmentList}) AND MV022 = '' AND MV021 != ''
+        `);
+        totalParticipants = result.recordset[0]?.totalUsers || 0;
+      }
+    }
+
     // 更新投票主記錄
     await pool.query(
       `UPDATE Votes SET 
@@ -357,11 +510,30 @@ router.put('/votes/:voteId', async (req, res) => {
         endTime = ?,
         allowAnonymous = ?,
         resultsPublic = ?,
+        participantDepartments = ?,
+        votetotal = ?,
         voteStatus = ?,
         updatedBy = ?,
         updatedAt = ?
       WHERE voteId = ?`,
-      [activityName, activityCode || null, voteTitle, voteDescription || null, voteType || 'general', allowMultiple ? 1 : 0, formatDateTimeForMySQL(startTime), formatDateTimeForMySQL(endTime), allowAnonymous ? 1 : 0, resultsPublic ? 1 : 0, voteStatus || 'Draft', updatedBy || 'system', formatDateTimeForMySQL(now), voteId]
+      [
+        activityName, 
+        activityCode || null, 
+        voteTitle, 
+        voteDescription || null, 
+        voteType || 'general', 
+        allowMultiple ? 1 : 0, 
+        formatDateTimeForMySQL(startTime), 
+        formatDateTimeForMySQL(endTime), 
+        allowAnonymous ? 1 : 0, 
+        resultsPublic ? 1 : 0, 
+        participantDepartments, // 更新部門列表
+        totalParticipants, // 更新總人數
+        voteStatus || 'Draft', 
+        updatedBy || 'system', 
+        formatDateTimeForMySQL(now), 
+        voteId
+      ]
     );
 
     // 更新投票選項
@@ -383,24 +555,11 @@ router.put('/votes/:voteId', async (req, res) => {
       }
     }
 
-    // 更新參與者
-    if (participants) {
-      // 刪除舊參與者
-      await pool.query('DELETE FROM VoteParticipants WHERE voteId = ?', [voteId]);
-
-      // 插入新參與者
-      if (participants.length > 0) {
-        for (const userId of participants) {
-          const participantId = `PART_${voteId}_${userId}`;
-          await pool.query(
-            'INSERT INTO VoteParticipants (participantId, voteId, userId) VALUES (?, ?, ?)',
-            [participantId, voteId, userId]
-          );
-        }
-      }
-    }
-
-    res.json({ message: 'Vote updated successfully' });
+    res.json({ 
+      message: 'Vote updated successfully',
+      participantDepartments,
+      totalParticipants
+    });
   } catch (err) {
     console.error('[PUT /votes/:voteId]', err);
     res.status(500).json({ error: err.message });
@@ -538,9 +697,6 @@ router.post('/votes/submit', async (req, res) => {
 router.get('/votes/:voteId/check-voted', async (req, res) => {
   const { voteId } = req.params;
   const { userId } = req.query;
-
-  console.log('[GET /votes/:voteId/check-voted] Request:', { voteId, userId });
-
   if (!voteId || !userId) {
     return res.status(400).json({ error: 'Missing required parameters' });
   }
@@ -553,7 +709,6 @@ router.get('/votes/:voteId/check-voted', async (req, res) => {
     );
 
     const hasVoted = result[0].voteCount > 0;
-    console.log('[GET /votes/:voteId/check-voted] Result:', { hasVoted, voteCount: result[0].voteCount });
     
     // 添加時間戳防止緩存
     res.set('X-Query-Timestamp', Date.now().toString())
@@ -570,8 +725,6 @@ router.get('/votes/:voteId/check-voted', async (req, res) => {
  */
 router.get('/votes/:voteId/results', async (req, res) => {
   const { voteId } = req.params;
-
-  console.log('[GET /votes/:voteId/results] Request for voteId:', voteId);
 
   if (!voteId) {
     return res.status(400).json({ error: 'voteId required' });
@@ -610,8 +763,6 @@ router.get('/votes/:voteId/results', async (req, res) => {
       totalParticipants: participantStats[0].totalParticipants,
       totalVotes: voteStats[0].totalVotes
     };
-    
-    console.log('[GET /votes/:voteId/results] Stats for', voteId, ':', stats);
 
     // 獲取投票者清單（如果不是匿名投票）
     let votersList = [];

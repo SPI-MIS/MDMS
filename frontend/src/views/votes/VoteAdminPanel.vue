@@ -44,7 +44,7 @@
       </v-col>
       <v-col cols="12" md="3">
         <v-card class="text-center pa-4">
-          <p class="text-caption text-gray-600 mb-2">{{ t('vote.totalParticipants') }}</p>
+          <p class="text-caption text-gray-600 mb-2">{{ t('vote.total') }}</p>
           <p class="text-h3 font-weight-bold text-success mb-2">{{ statistics.totalParticipants }}</p>
           <p class="text-caption">{{ ((statistics.totalVotes / statistics.totalParticipants) * 100).toFixed(1) }}% {{ t('vote.participationRate') }}</p>
         </v-card>
@@ -106,9 +106,11 @@
             <td>{{ formatDateTime(vote.endTime) }}</td>
             <td>
               <span v-if="voteStatistics[vote.voteId]">
-                {{ voteStatistics[vote.voteId].totalVotes }} / {{ voteStatistics[vote.voteId].totalParticipants }}
+                {{ voteStatistics[vote.voteId].totalVotes }} / {{ vote.votetotal || totalCompanyUsers }}
               </span>
-              <span v-else>-</span>
+              <span v-else>
+                0 / {{ vote.votetotal || totalCompanyUsers }}
+              </span>
             </td>
             <td>
               <v-btn
@@ -173,6 +175,7 @@
       v-model="statisticsDialog"
       :vote="selectedVote"
       :statistics="voteStatistics[selectedVote?.voteId]"
+      :total-company-users="totalCompanyUsers"
       @close="statisticsDialog = false"
     />
 
@@ -226,6 +229,7 @@ const activateDialog = ref(false)
 const selectedVote = ref(null)
 const voteStatistics = ref({})
 const isLoadingVotes = ref(false)  // 防止重複加載
+const totalCompanyUsers = ref(0)  // 全廠總人數
 
 // Computed
 const filteredVotes = computed(() => {
@@ -398,6 +402,17 @@ const loadVotes = async () => {
   try {
     isLoadingVotes.value = true
     console.log('[VoteAdminView] Loading votes...')
+    
+    // 加載全廠總人數
+    try {
+      const participantData = await voteStore.fetchParticipantDepartments()
+      totalCompanyUsers.value = participantData?.allCompany?.activeUsers || 0
+      console.log('[VoteAdminView] Total company users:', totalCompanyUsers.value)
+    } catch (error) {
+      console.error('Error loading total company users:', error)
+      totalCompanyUsers.value = 0
+    }
+    
     await voteStore.fetchVotes()
     console.log('[VoteAdminView] Loaded', voteStore.votes.length, 'votes')
     

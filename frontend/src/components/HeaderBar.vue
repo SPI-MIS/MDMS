@@ -52,6 +52,10 @@
         </template>
 
         <v-list-item @click="goTo(isLoggedIn ? '/mold-type' : '/login')">
+          <v-list-item-title>{{ $t('order.creatdata') }}</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item @click="goTo(isLoggedIn ? '/mold-type' : '/login')">
           <v-list-item-title>{{ $t('order.settings') }}</v-list-item-title>
         </v-list-item>
       </v-list-group>

@@ -22,7 +22,7 @@ import QAtool from '@/views/tool/QAExcelImport.vue';
 
 import VoteView from '@/views/votes/VoteView.vue';
 import EmployeeVoteView from '@/views/votes/EmployeeVoteView.vue';
-import VoteAdminView from '@/views/votes/VoteAdminView.vue';
+import VoteAdminPanel from '@/views/votes/VoteAdminPanel.vue';
 import VoteITManagementView from '@/views/votes/VoteITManagementView.vue';
 
 import exclusionView from '@/views/exclusion/HomeView.vue';
@@ -130,7 +130,7 @@ const routes = [
   {
     path: '/vote-admin',
     name: 'VoteAdmin',
-    component: VoteAdminView,
+    component: VoteAdminPanel,
     meta: {
       title: 'vote.adminPanel',
       requiresAuth: true,

@@ -17,7 +17,7 @@
       </v-col>
       <v-col cols="12" md="3">
         <v-card class="text-center pa-4">
-          <p class="text-caption text-gray-600 mb-2">{{ t('vote.totalParticipants') }}</p>
+          <p class="text-caption text-gray-600 mb-2">{{ t('vote.total') }}</p>
           <p class="text-h3 font-weight-bold text-success mb-2">{{ statistics.totalParticipants }}</p>
           <p class="text-caption">{{ ((statistics.totalVotes / statistics.totalParticipants) * 100).toFixed(1) }}% {{ t('vote.participationRate') }}</p>
         </v-card>

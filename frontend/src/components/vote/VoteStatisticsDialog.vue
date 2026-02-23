@@ -9,21 +9,21 @@
           <v-row>
             <v-col cols="12" md="4">
               <v-card class="text-center pa-4" color="primary" dark>
-                <p class="text-caption">{{ t('vote.totalVotes') }}</p>
-                <p class="text-h4 font-weight-bold">{{ statistics.totalVotes || 0 }}</p>
+                <p class="text-caption">{{ t('vote.denominator') }}</p>
+                <p class="text-h4 font-weight-bold">{{ getTotalParticipants() }}</p>
               </v-card>
             </v-col>
             <v-col cols="12" md="4">
               <v-card class="text-center pa-4" color="info" dark>
-                <p class="text-caption">{{ t('vote.totalParticipants') }}</p>
-                <p class="text-h4 font-weight-bold">{{ statistics.totalParticipants || 0 }}</p>
+                <p class="text-caption">{{ t('vote.molecular') }}</p>
+                <p class="text-h4 font-weight-bold">{{ statistics.totalVotes || 0 }}</p>
               </v-card>
             </v-col>
             <v-col cols="12" md="4">
               <v-card class="text-center pa-4" color="success" dark>
                 <p class="text-caption">{{ t('vote.participationRate') }}</p>
                 <p class="text-h4 font-weight-bold">
-                  {{ statistics.totalParticipants > 0 ? Math.round((statistics.totalVotes / statistics.totalParticipants) * 100) : 0 }}%
+                  {{ calculateParticipationRate() }}%
                 </p>
               </v-card>
             </v-col>
@@ -129,6 +129,10 @@ const props = defineProps({
   statistics: {
     type: Object,
     default: null
+  },
+  totalCompanyUsers: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -147,6 +151,11 @@ const isOpen = computed({
 // 方法
 const onClose = () => {
   emit('close')
+}
+
+// 獲取應投票人數（優先使用 votetotal，沒有則使用全廠人數）
+const getTotalParticipants = () => {
+  return props.vote?.votetotal || props.totalCompanyUsers || 0
 }
 
 // 使用共用的 formatDateTime（由 '@/utils/time' 提供）
@@ -168,6 +177,16 @@ const calculateStatistics = () => {
   }
 }
 
+const calculateParticipationRate = () => {
+  if (!props.statistics || !props.vote) return 0
+  
+  const totalVotes = props.statistics.totalVotes || 0
+  const totalParticipants = getTotalParticipants()
+  
+  if (totalParticipants === 0) return 0
+  return Math.round((totalVotes / totalParticipants) * 100)
+}
+
 const exportData = () => {
   if (!props.vote || !props.statistics) return
 
@@ -179,6 +198,8 @@ const exportData = () => {
     `${opt.percentage}%`
   ])
 
+  const totalParticipants = getTotalParticipants()
+
   const csvContent = [
     [t('vote.voteStatistics'), props.vote.activityName],
     [''],
@@ -186,7 +207,7 @@ const exportData = () => {
     ...rows,
     [''],
     [t('vote.totalVotes'), props.statistics.totalVotes],
-    [t('vote.totalParticipants'), props.statistics.totalParticipants]
+    [t('vote.totalParticipants'), totalParticipants]
   ]
     .map(row => row.map(cell => `"${cell}"`).join(','))
     .join('\n')

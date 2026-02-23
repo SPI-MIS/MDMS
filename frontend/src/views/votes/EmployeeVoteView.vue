@@ -79,7 +79,7 @@
         <v-card-text class="text-center py-6">
           <v-icon size="64" color="success" class="mb-4">mdi-check-circle</v-icon>
           <p class="text-subtitle-1 mb-2">{{ t('vote.voteSubmitted') }}</p>
-          <p class="text-caption text-gray-700">{{ t('vote.canViewResultsAnytime') }}</p>
+          <!-- <p class="text-caption text-gray-700">{{ t('vote.canViewResultsAnytime') }}</p> -->
         </v-card-text>
         <v-card-actions class="justify-center pb-4">
           <v-btn color="primary" variant="elevated" @click="successDialog = false">
@@ -188,25 +188,18 @@ const onSubmitVote = async (voteData) => {
     const voteId = selectedVote.value.voteId
     
     // 投票成功後立即更新已投票狀態
-    console.log(`[Setting hasVotedMap] voteId=${voteId} to true`)
     hasVotedMap.value[voteId] = true
     
     // 檢查更新是否已生效
-    console.log(`[Verify hasVotedMap] voteId=${voteId} is now ${hasVotedMap.value[voteId]}`)
-    console.log(`[voteCardMap] ${voteId} = ${voteCardMap.value[voteId]}`)
-    
     voteDialog.value = false
     successDialog.value = true
     
     // 立即檢查投票狀態以與伺服器同步（不需要等待）
-    console.log('[Calling checkUserVoteStatus immediately]')
     await checkUserVoteStatus()
     
     // 關閉成功對話框
     setTimeout(() => {
       successDialog.value = false
-      console.log('[Success dialog closed]')
-      console.log(`[Final state] hasVotedMap[${voteId}] = ${hasVotedMap.value[voteId]}`)
     }, 1500)
   } catch (error) {
     console.error('Error submitting vote:', error)
@@ -231,61 +224,43 @@ const onViewResults = async (vote) => {
 const checkUserVoteStatus = async () => {
   try {
     isCheckingVoteStatus.value = true
-    console.log('[checkUserVoteStatus] Starting status check, userId:', userId.value)
     
     if (!userId.value) {
       console.warn('[checkUserVoteStatus] No userId found, cannot check status')
       return
     }
-
-    console.log(`[checkUserVoteStatus] Checking status for ${voteStore.votes.length} votes`)
-    
     // 收集所有投票狀態
     const newVotedStatus = {}
     
     for (const vote of voteStore.votes) {
       try {
-        console.log(`[checkUserVoteStatus] Checking ${vote.voteId} for user ${userId.value}`)
         const hasVoted = await voteStore.checkUserVoted(vote.voteId, userId.value)
-        console.log(`[checkUserVoted] ${vote.voteId}: ${hasVoted}`)
         newVotedStatus[vote.voteId] = hasVoted
-      } catch (error) {
-        console.error(`[checkUserVoteStatus] Error checking ${vote.voteId}:`, error)
-      }
+      } 
+      catch (error) { console.error(`[checkUserVoteStatus] Error checking ${vote.voteId}:`, error) }
     }
     
     // 使用 Object.assign 確保 Vue 響應性
-    console.log('[checkUserVoteStatus] Before assignment:', hasVotedMap.value)
     Object.assign(hasVotedMap.value, newVotedStatus)
-    console.log('[checkUserVoteStatus] After assignment:', hasVotedMap.value)
-    
-    console.log('[checkUserVoteStatus] Complete. Final hasVotedMap:', hasVotedMap.value)
   } catch (error) {
     console.error('Error checking vote status:', error)
   } finally {
     isCheckingVoteStatus.value = false
-    console.log('[checkUserVoteStatus] Status check finished, isCheckingVoteStatus:', isCheckingVoteStatus.value)
   }
 }
 
 // 監視 hasVotedMap 的變化以調試
-watch(() => hasVotedMap.value, (newVal, oldVal) => {
-  console.log('[hasVotedMap changed]', newVal)
-}, { deep: true })
+watch(() => hasVotedMap.value, (newVal, oldVal) => { console.log('[hasVotedMap changed]', newVal) }, { deep: true })
 
 // 初始化
 onMounted(async () => {
   try {
-    console.log('[onMounted] Starting initialization, userId:', userId.value)
     await voteStore.fetchVotes()
-    console.log('[onMounted] Votes fetched:', voteStore.votes.length)
     
     // 等待一下確保 userId 已經可用
     await new Promise(resolve => setTimeout(resolve, 100))
-    console.log('[onMounted] userId value:', userId.value)
     
     await checkUserVoteStatus()
-    console.log('[onMounted] Initialization complete')
   } catch (error) {
     console.error('Error loading votes:', error)
   }

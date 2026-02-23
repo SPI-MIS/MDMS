@@ -18,8 +18,8 @@ export function parseDateTimeSafe(dateStr) {
 }
 
 /**
- * 將 ISO 字符串轉換為台北時區的格式化字符串 (YYYY-MM-DD HH:MM)
- * 用於時間輸入欄位
+ * 將 ISO 字符串轉換為台北時區的格式化字符串 (YYYY-MM-DDTHH:MM)
+ * 用於 datetime-local 輸入欄位
  */
 export function formatDateForTimezoneInput(dateStr) {
   if (!dateStr) return ''
@@ -44,7 +44,7 @@ export function formatDateForTimezoneInput(dateStr) {
       parts[part.type] = part.value
     })
     
-    return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`
+    return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
   } catch (error) {
     console.error('Error formatting date for input:', error)
     return ''
@@ -53,14 +53,14 @@ export function formatDateForTimezoneInput(dateStr) {
 
 /**
  * 將使用者輸入的本地時間字符串轉換為 ISO 字符串
- * 例：輸入 "2026-02-06 14:30" → 輸出 "2026-02-06T14:30:00"
+ * 例：輸入 "2026-02-06T14:30" → 輸出 "2026-02-06T14:30:00"
  * (時間戳直接在當前時區解析，後端根據需要進行時區轉換)
  */
 export function parseLocalTimeInput(timeStr) {
   if (!timeStr) return ''
   try {
-    // 將用戶輸入的 "YYYY-MM-DD HH:MM" 轉換為 ISO 格式
-    const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/)
+    // 將用戶輸入的 "YYYY-MM-DDTHH:MM" 或 "YYYY-MM-DD HH:MM" 轉換為 ISO 格式
+    const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/)
     if (!match) return timeStr
     
     const [, year, month, day, hour, minute] = match
