@@ -3,13 +3,13 @@
     <v-row align="center" justify="center" class="text-center">
       <!-- 除外工時 -->
       <v-col cols="12" sm="4">
-        <v-btn block height="120" color="primary" class="text-h5 font-weight-bold" @click="goTo('/exclusionhome')" > 
+        <v-btn block height="120" color="primary" class="text-h5 font-weight-bold" @click="goTo('/main')" > 
           <div style="white-space: normal; line-height: 1.2;">除外工時</div></v-btn>
       </v-col>
 
       <!-- 訂便當 -->
       <v-col cols="12" sm="4">
-        <v-btn block height="120" color="success" class="text-h5 font-weight-bold" @click="goTo('status')" > 
+        <v-btn block height="120" color="success" class="text-h5 font-weight-bold" @click="goTo('/main')" > 
           <div style="white-space: normal; line-height: 1.2;">訂便當</div></v-btn>
       </v-col>
 

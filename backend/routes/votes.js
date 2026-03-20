@@ -110,6 +110,8 @@ router.get('/votes', async (req, res) => {
         v.activityName, 
         v.activityCode, 
         v.voteTitle, 
+        v.voteDescription,
+        v.voteType,
         v.voteStatus,
         v.votetotal, 
         v.startTime, 

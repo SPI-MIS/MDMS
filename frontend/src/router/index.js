@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import i18n from '@/plugins/i18n'   // 若名稱不同請調整
 
+import Maintenance from '@/views/Maintenance.vue';
 import HomePage from '@/views/HomePage.vue';
 import LoginView from '@/views/LoginView.vue';
 import changePasswordForm from '@/views/ChangePassword.vue';
@@ -28,6 +29,12 @@ import VoteITManagementView from '@/views/votes/VoteITManagementView.vue';
 import exclusionView from '@/views/exclusion/HomeView.vue';
 
 const routes = [
+  {
+    path: '/main',
+    name: 'main',
+    component: Maintenance,
+    meta: { title: '系統維護中.....' } // 這裡的 key 要對應 i18n 語系檔
+  },
   {
     path: '/',
     name: 'home',
