@@ -36,7 +36,7 @@
             <v-list-item-title>{{ $t('exclusion.home') }}</v-list-item-title>
           </v-list-item>
         </template>
-        <v-list-item @click="goTo('/exclusionhome')">
+        <v-list-item @click="goTo('/main')">
           <v-list-item-title>{{ $t('exclusion.settings') }}</v-list-item-title>
         </v-list-item>        
       </v-list-group>
@@ -51,11 +51,11 @@
           </v-list-item>
         </template>
 
-        <v-list-item @click="goTo(isLoggedIn ? '/mold-type' : '/login')">
+        <v-list-item @click="goTo(isLoggedIn ? '/main' : '/login')">
           <v-list-item-title>{{ $t('order.creatdata') }}</v-list-item-title>
         </v-list-item>
 
-        <v-list-item @click="goTo(isLoggedIn ? '/mold-type' : '/login')">
+        <v-list-item @click="goTo(isLoggedIn ? '/main' : '/login')">
           <v-list-item-title>{{ $t('order.settings') }}</v-list-item-title>
         </v-list-item>
       </v-list-group>

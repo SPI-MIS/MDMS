@@ -11,7 +11,7 @@
 
 <script setup>
 import { ref } from 'vue';
-const maintenanceTime = ref('2026/03/21 00:00 - 06:00');
+// const maintenanceTime = ref('2026/03/21 00:00 - 06:00');
 </script>
 
 <style scoped>
