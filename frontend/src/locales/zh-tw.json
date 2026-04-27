@@ -15,13 +15,15 @@
   },
   "excelimport": "小工具",
   "exclusion": {
-    "home": "除外工時首頁",
+    "home": "除外工時",
     "settings": "除外工時資料管理"
   },
-  "order": {
-    "home": "訂便當首頁",
-    "settings": "訂便當資料查詢",
-    "creatdata": "進行便當訂購"
+  "bento": {
+    "home": "便當訂購",
+    "total": "便當匯總(人資/廠務)",
+    "creatdata": "每日便當訂購",
+    "all": "我的訂購記錄",
+    "overtime": "加班便當訂購"
   },
   "mdms": {
     "home": "模具管理首頁",
@@ -72,7 +74,7 @@
     "pleaseCheckFields": "請檢查所有必填欄位"
   },
   "vote": {
-    "home": "投票首頁",
+    "home": "公司投票",
     "createActivity": "投票活動建立",
     "searchActivity": "搜尋投票活動",
     "employeeVoting": "員工投票",

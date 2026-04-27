@@ -4,6 +4,7 @@ const { sql, getPool: getSMSPool } = require('../db/db_SMS');
 const { getPool: getSPIPool } = require('../db/db_SPI');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
 
 function sha256Hex(s) {
@@ -100,8 +101,10 @@ router.post('/login', async (req, res) => {
         logger.info('[Login] 登入成功 - 權限控管系統:', { userId: user.SA001, role: normalizedRole });
 
         // 登入成功 - 權限控管系統用戶
+        const token = jwt.sign({ userId: user.SA001 }, process.env.JWT_SECRET || 'secret', { expiresIn: '24h' });
         return res.json({
           success: true,
+          token,
           userId: user.SA001,
           userName: user.SA002,
           role: normalizedRole,
@@ -162,9 +165,12 @@ router.post('/login', async (req, res) => {
         const normalizedRole = normalizeRole(null, 'hr');
         logger.info('[Login] 登入成功 - HR 系統:', { userId: hrUser.MV001, role: normalizedRole });
 
+        const token = jwt.sign({ userId: String(hrUser.MV001 || '').trim() }, process.env.JWT_SECRET || 'secret', { expiresIn: '24h' });
+
         // 登入成功 - HR 系統用戶（一般使用者）
         return res.json({
           success: true,
+          token,
           userId: hrUser.MV001,
           userName: hrUser.MV002,
           role: normalizedRole,

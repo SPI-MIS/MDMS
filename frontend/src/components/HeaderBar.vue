@@ -47,16 +47,23 @@
       <v-list-group prepend-icon="mdi-file-account">
         <template #activator="{ props: activatorPropsOrder }">
           <v-list-item v-bind="activatorPropsOrder">
-            <v-list-item-title>{{ $t('order.home') }}</v-list-item-title>
+            <v-list-item-title>{{ $t('bento.home') }}</v-list-item-title>
           </v-list-item>
         </template>
 
-        <v-list-item @click="goTo(isLoggedIn ? '/main' : '/login')">
-          <v-list-item-title>{{ $t('order.creatdata') }}</v-list-item-title>
+        <v-list-item @click="goTo(isLoggedIn ? '/bento' : '/login')">
+          <v-list-item-title>{{ $t('bento.creatdata') }}</v-list-item-title>
         </v-list-item>
 
-        <v-list-item @click="goTo(isLoggedIn ? '/main' : '/login')">
-          <v-list-item-title>{{ $t('order.settings') }}</v-list-item-title>
+        <v-list-item @click="goTo(isLoggedIn ? '/bento-all-orders' : '/login')">
+          <v-list-item-title>{{ $t('bento.all') }}</v-list-item-title>
+        </v-list-item>
+
+        <v-list-item @click="goTo(isLoggedIn ? '/bento-summary' : '/login')">
+          <v-list-item-title>{{ $t('bento.total') }}</v-list-item-title>
+        </v-list-item>
+        <v-list-item v-if="hasOvertimePerm || String(manager) === '1'" @click="goTo('/bento-overtime')">
+          <v-list-item-title>{{ $t('bento.overtime') }}</v-list-item-title>
         </v-list-item>
       </v-list-group>
       <v-divider />
@@ -193,7 +200,7 @@
       </v-list-item>
       <v-list-item @click="goTo('/')" title="首頁" />
       <v-list-item v-if="String(manager) === '1'" @click="goTo('/manage')" title="系統管理" />
-      <v-list-item v-if="showVoteAdmin || String(manager) === '1' || String(admin) === '1'"S @click="changePassword" title="變更密碼" />
+      <v-list-item v-if="showVoteAdmin || String(manager) === '1' || String(admin) === '1'" @click="changePassword" title="變更密碼" />
       <v-list-item v-if="userId && userName" @click="logout" title="登出" />
       <v-list-item v-else @click="goTo('/login')" title="登入" />
       <v-divider class="my-1" />
@@ -214,12 +221,21 @@
 import { useDisplay } from 'vuetify'
 import { useI18n } from 'vue-i18n';
 import { useRouter, useRoute } from 'vue-router';
-import { ref, onMounted ,watch } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useAuth } from '@/composables/useAuth';
+import api from '@/utils/api';
 
 const logoUrl = new URL('@/assets/logo.svg', import.meta.url).href
-const { mdAndUp } = useDisplay()  // true 表示 ≥ sm
-const { isLoggedIn, logout } = useAuth();
+const { mdAndUp } = useDisplay()
+const { isLoggedIn, logout, hasOvertimePerm, setOvertimePerm } = useAuth();
+
+const fetchOvertimePerm = async () => {
+  if (!isLoggedIn.value) return;
+  try {
+    const { data } = await api.get('/bento/overtime/permission');
+    setOvertimePerm(data.hasPermission);
+  } catch { /* 保留已快取值 */ }
+};
 const drawer = ref(false);
 const route = useRoute();
 
@@ -265,7 +281,13 @@ watch(lang, (val) => {
   }
 })
 
-// 初始化語系
+// 登入後重新檢查加班便當權限
+watch(isLoggedIn, (val) => {
+  if (val) fetchOvertimePerm();
+  else setOvertimePerm(false);
+});
+
+// 初始化語系 + 加班便當權限（已登入時直接查）
 onMounted(() => {
   const saved = localStorage.getItem('lang')
   if (saved) {
@@ -275,6 +297,7 @@ onMounted(() => {
       locale.value = match.key
     }
   }
+  fetchOvertimePerm();
 })
 
 const onSelectLang = (lang) => {

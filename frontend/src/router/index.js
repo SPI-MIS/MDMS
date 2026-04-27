@@ -7,16 +7,7 @@ import HomePage from '@/views/HomePage.vue';
 import LoginView from '@/views/LoginView.vue';
 import changePasswordForm from '@/views/ChangePassword.vue';
 
-import mdmsHomeView from '@/views/mdms/MDMSHomeView.vue';
-import ProfileView from '@/views/mdms/ProfileView.vue';
-import SettingsView from '@/views/mdms/SettingsView.vue';
-import StatusView from '@/views/mdms/StatusView.vue';
 import ManageView from '@/views/ManageView.vue';
-import moldTypeForm from '@/views/mdms/MoldtypeForm.vue';
-import moldCategoryForm from '@/views/mdms/MoldCategoryForm.vue';
-import moldMaterialForm from '@/views/mdms/MoldMaterialForm.vue';
-import vendorForm from '@/views/mdms/VendorForm.vue';
-import moldBasicForm from '@/views/mdms/MoldBasicForm.vue';
 
 import toolexcel from '@/views/tool/ExcelImport.vue';
 import QAtool from '@/views/tool/QAExcelImport.vue';
@@ -27,6 +18,11 @@ import VoteAdminPanel from '@/views/votes/VoteAdminPanel.vue';
 import VoteITManagementView from '@/views/votes/VoteITManagementView.vue';
 
 import exclusionView from '@/views/exclusion/HomeView.vue';
+
+import BentoOrder from '@/views/bento/Bento_View.vue';
+import BentoSummary from '@/views/bento/BentoSummary.vue';
+import BentoAllOrders from '@/views/bento/BentoAllOrders.vue';
+import BentoOvertime from '@/views/bento/BentoOvertime.vue';
 
 const routes = [
   {
@@ -46,54 +42,6 @@ const routes = [
     name: 'login',
     component: LoginView,
     meta: { title: 'system' } // 這裡的 key 要對應 i18n 語系檔
-  },
-  { 
-    path: '/mdmshome', 
-    component: mdmsHomeView,
-    meta: { title: 'system' }
-  },
-  {
-    path: '/profile',
-    name: 'profile',
-    component: ProfileView,
-    meta: { title: 'profile' }
-  },
-  {
-    path: '/settings',
-    name: 'settings',
-    component: SettingsView,
-    meta: { title: 'settings' }
-  },
-  { 
-    path: '/mold-type', 
-    component: moldTypeForm,
-    meta: { title: 'moldTypeForm' }
-  },
-  { 
-    path: '/mold-category', 
-    component: moldCategoryForm,
-    meta: { title: 'moldCategory' }
-  },
-  { 
-    path: '/material', 
-    component: moldMaterialForm,
-    meta: { title: 'material' }
-  },
-  { 
-    path: '/vendor', 
-    component: vendorForm,
-    meta: { title: 'vendor' }
-  },
-  { 
-    path: '/mold-basic', 
-    component: moldBasicForm,
-    meta: { title: 'moldBasic' }
-  },
-  {
-    path: '/status',
-    name: 'status',
-    component: StatusView,
-    meta: { title: 'status' }
   },
   {
     path: '/manage',
@@ -167,6 +115,40 @@ const routes = [
     path: '/exclusionhome', 
     component: exclusionView,
     meta: { title: 'system' }
+  },
+  {
+    path: '/bento',
+    component: BentoOrder,
+    meta: {
+      title: 'bento.creatdata',
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/bento-summary',
+    component: BentoSummary,
+    meta: {
+      title: 'bento.total',
+      requiresAuth: true,
+      role: 'manager'
+    }
+  },
+  {
+    path: '/bento-all-orders',
+    component: BentoAllOrders,
+    meta: {
+      title: 'bento.all',
+      requiresAuth: true,
+      role: 'manager'
+    }
+  },
+  {
+    path: '/bento-overtime',
+    component: BentoOvertime,
+    meta: {
+      title: 'bento.overtime',
+      requiresAuth: true
+    }
   }
 ]
 

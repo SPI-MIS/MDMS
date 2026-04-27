@@ -59,7 +59,7 @@ const submitLogin = async () => {
     })
 
     // 登入成功：將帳號資訊傳出給 App.vue，並寫入 localStorage
-    const { userId, userName, manager, admin } = res.data
+    const { userId, userName, manager, admin, token } = res.data
 
     emit('login-success', { userId, userName, manager, admin })
 
@@ -69,6 +69,7 @@ const submitLogin = async () => {
         userName: res.data.userName,
         manager: res.data.manager,
         admin: res.data.admin,
+        token: res.data.token,
         perms:res.data.perms     // { C,R,U,D,A } booleans
       });
 
