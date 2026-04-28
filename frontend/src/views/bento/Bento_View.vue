@@ -3,12 +3,12 @@
   <v-container class="bento-container" fluid>
     <v-row>
       <v-col cols="12">
-        <h1>便當訂購</h1>
+        <h1>{{ $t('bento.home') }}</h1>
       </v-col>
 
       <v-col cols="12" v-if="!isValidTime">
         <v-card elevation="2" class="p-4">
-          <v-card-title class="d-flex align-center">今日已訂購餐點
+          <v-card-title class="d-flex align-center">{{ $t('bento.todayOrdered') }}
             <v-spacer />
             <v-btn
               variant="tonal"
@@ -17,14 +17,14 @@
               prepend-icon="mdi-history"
               @click="router.push('/bento-all-orders')"
             >
-              查看所有記錄
+              {{ $t('bento.viewAllRecords') }}
             </v-btn>
           </v-card-title>
           <v-card-text>
             <div v-if="todayOrders.length === 0">
               <v-alert type="info" text>
                 <v-icon>mdi-information</v-icon>
-                今日尚未訂購餐點
+                {{ $t('bento.todayNoOrder') }}
               </v-alert>
             </div>
             <div v-else>
@@ -36,7 +36,7 @@
                         <v-icon :color="order.meal_type === 'lunch' ? 'orange' : 'blue'" class="me-2">
                           {{ order.meal_type === 'lunch' ? 'mdi-white-balance-sunny' : 'mdi-weather-night' }}
                         </v-icon>
-                        <span class="text-h6">{{ order.meal_type === 'lunch' ? '午餐' : '晚餐' }}</span>
+                        <span class="text-h6">{{ order.meal_type === 'lunch' ? $t('bento.lunch') : $t('bento.dinner') }}</span>
                       </div>
                       <v-spacer></v-spacer>
                       <v-chip
@@ -61,7 +61,7 @@
                       </div>
                       <v-divider class="my-2"></v-divider>
                       <div class="d-flex justify-space-between align-center">
-                        <span class="text-body-2 text-medium-emphasis">總金額</span>
+                        <span class="text-body-2 text-medium-emphasis">{{ $t('bento.totalAmount') }}</span>
                         <span class="text-h6 font-weight-bold primary--text">
                           ${{ calculateOrderTotal(order.items) }}
                         </span>
@@ -77,7 +77,7 @@
 
       <v-col cols="12" v-else>
         <v-card elevation="2" class="p-4">
-          <v-card-title>選擇餐點</v-card-title>
+          <v-card-title>{{ $t('bento.selectMeal') }}</v-card-title>
           <v-card-text>
             <v-form @submit.prevent="submitOrder">
               <v-radio-group v-model="orderData.mealType" row>
@@ -92,7 +92,7 @@
               <v-select
                 :items="vendors"
                 v-model="selectedVendor"
-                label="選擇店家"
+                :label="$t('bento.selectVendor')"
                 @update:model-value="onVendorChange"
                 dense
                 outlined
@@ -100,35 +100,60 @@
 
               <v-row v-if="selectedVendor" class="mt-4">
                 <v-col cols="12">
-                  <v-subheader>{{ selectedVendor }} 的餐點</v-subheader>
+                  <v-subheader>{{ $t('bento.vendorMenu', { vendor: selectedVendor }) }}</v-subheader>
                 </v-col>
-                <v-col cols="12" md="4" v-for="item in filteredItems" :key="item.id">
+                <v-col cols="12" md="2" v-for="item in filteredItems" :key="item.id">
                   <v-card class="pa-2" outlined>
                     <div class="d-flex justify-space-between align-center">
-                      <div>{{ item.item_name }} - ${{ item.price }}</div>
+                      <div>{{ item.displayName }} - ${{ item.price }}</div>
                       <v-text-field
                         type="number"
                         v-model.number="orderData.items[item.id]"
                         min="0"
-                        label="數量"
+                        :label="$t('bento.quantity')"
                         dense
                         hide-details
-                        style="width:100px"
+                        style="width:50%"
+                        class="ml-2"
                       />
                     </div>
                   </v-card>
                 </v-col>
               </v-row>
 
+              <v-row v-if="selectedItemsSummary.length > 0" class="mt-4">
+                <v-col cols="12">
+                  <div class="text-subtitle-2 mb-1">{{ $t('bento.selectedItems') }}</div>
+                  <v-table density="compact">
+                    <thead>
+                      <tr>
+                        <th>{{ $t('bento.vendor') }}</th>
+                        <th>{{ $t('bento.item') }}</th>
+                        <th>{{ $t('bento.quantity') }}</th>
+                        <th>{{ $t('bento.subtotal') }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="row in selectedItemsSummary" :key="row.id">
+                        <td>{{ row.vendor }}</td>
+                        <td>{{ row.name }}</td>
+                        <td>{{ row.quantity }}</td>
+                        <td>${{ row.price * row.quantity }}</td>
+                      </tr>
+                    </tbody>
+                  </v-table>
+                </v-col>
+              </v-row>
+
               <v-row class="mt-4">
                 <v-col cols="12">
                   <div v-if="totalAmount > 0" class="total">
-                    <v-chip color="primary" text-color="white">總金額：${{ totalAmount }}</v-chip>
+                    <v-chip color="primary" text-color="white">{{ $t('bento.totalAmount') }}：${{ totalAmount }}</v-chip>
                   </div>
                 </v-col>
                 <v-col cols="12">
                   <v-btn type="submit" :disabled="loading || totalAmount === 0" color="primary">
-                    提交訂購
+                    {{ $t('bento.submitOrder') }}
                   </v-btn>
                 </v-col>
               </v-row>
@@ -138,7 +163,7 @@
 
         <v-card elevation="2" class="p-4 mt-4">
           <v-card-title class="d-flex align-center">
-            今日訂購記錄
+            {{ $t('bento.todayRecords') }}
             <v-spacer />
             <v-btn
               variant="tonal"
@@ -147,14 +172,14 @@
               prepend-icon="mdi-history"
               @click="router.push('/bento-all-orders')"
             >
-              查看所有記錄
+              {{ $t('bento.viewAllRecords') }}
             </v-btn>
           </v-card-title>
           <v-card-text>
             <div v-if="todayOrders.length === 0">
               <v-alert type="info" text>
                 <v-icon>mdi-information</v-icon>
-                今日尚無訂購記錄
+                {{ $t('bento.todayNoRecords') }}
               </v-alert>
             </div>
             <div v-else class="order-records">
@@ -166,8 +191,8 @@
                         <v-icon :color="order.meal_type === 'lunch' ? 'orange' : 'blue'" class="me-2">
                           {{ order.meal_type === 'lunch' ? 'mdi-white-balance-sunny' : 'mdi-weather-night' }}
                         </v-icon>
-                        <span class="text-h6">{{ order.meal_type === 'lunch' ? '午餐' : '晚餐' }}</span>
-                        <v-chip v-if="!canEditOrder(order)" color="grey" text-color="white" small class="ms-2">已過期</v-chip>
+                        <span class="text-h6">{{ order.meal_type === 'lunch' ? $t('bento.lunch') : $t('bento.dinner') }}</span>
+                        <v-chip v-if="!canEditOrder(order)" color="grey" text-color="white" small class="ms-2">{{ $t('bento.expired') }}</v-chip>
                       </div>
                       <v-spacer></v-spacer>
                       <v-chip
@@ -192,7 +217,7 @@
                       </div>
                       <v-divider class="my-2"></v-divider>
                       <div class="d-flex justify-space-between align-center">
-                        <span class="text-body-2 text-medium-emphasis">總金額</span>
+                        <span class="text-body-2 text-medium-emphasis">{{ $t('bento.totalAmount') }}</span>
                         <span class="text-h6 font-weight-bold primary--text">
                           ${{ calculateOrderTotal(order.items) }}
                         </span>
@@ -201,7 +226,7 @@
                     <v-card-actions class="pa-3 pt-0">
                       <v-spacer></v-spacer>
                       <v-btn text small color="warning" :disabled="!canEditOrder(order)" @click="editOrder(order)" >
-                        <v-icon small class="me-1">mdi-pencil</v-icon> 編輯 </v-btn>
+                        <v-icon small class="me-1">mdi-pencil</v-icon> {{ $t('common.edit') }} </v-btn>
                       <v-btn
                         text
                         small
@@ -209,7 +234,7 @@
                         :disabled="!canEditOrder(order)"
                         @click="deleteOrder(order.id)"
                       >
-                        <v-icon small class="me-1">mdi-delete</v-icon> 刪除 </v-btn>
+                        <v-icon small class="me-1">mdi-delete</v-icon> {{ $t('common.delete') }} </v-btn>
                     </v-card-actions>
                   </v-card>
                 </v-col>
@@ -221,17 +246,17 @@
         <!-- 編輯訂單對話框 -->
         <v-dialog v-model="editDialog" max-width="600px">
           <v-card>
-            <v-card-title>編輯訂單</v-card-title>
+            <v-card-title>{{ $t('bento.editOrder') }}</v-card-title>
             <v-card-text>
               <v-form @submit.prevent="submitEdit">
                 <v-alert type="info" dense text>
-                  編輯 {{ editData.mealType === 'lunch' ? '午餐' : '晚餐' }} 訂單
+                  {{ $t('bento.editOrderFor', { meal: editData.mealType === 'lunch' ? $t('bento.lunch') : $t('bento.dinner') }) }}
                 </v-alert>
 
                 <v-select
                   :items="vendors"
                   v-model="editData.selectedVendor"
-                  label="選擇店家"
+                  :label="$t('bento.selectVendor')"
                   @update:model-value="onEditVendorChange"
                   dense
                   outlined
@@ -244,15 +269,15 @@
                   <v-col cols="12" md="4" v-for="item in editFilteredItems" :key="item.id">
                     <v-card class="pa-2" outlined>
                       <div class="d-flex justify-space-between align-center">
-                        <div>{{ item.item_name }} - ${{ item.price }}</div>
+                        <div>{{ item.displayName }} - ${{ item.price }}</div>
                         <v-text-field
                           type="number"
                           v-model.number="editData.items[item.id]"
                           min="0"
-                          label="數量"
+                          :label="$t('bento.quantity')"
                           dense
                           hide-details
-                          style="width:100px"
+                          style="width:100%"
                         />
                       </div>
                     </v-card>
@@ -267,9 +292,9 @@
                   </v-col>
                   <v-col cols="12">
                     <v-btn type="submit" :disabled="editLoading || editTotalAmount === 0" color="primary">
-                      更新訂單
+                      {{ $t('bento.updateOrder') }}
                     </v-btn>
-                    <v-btn @click="editDialog = false" class="ml-2">取消</v-btn>
+                    <v-btn @click="editDialog = false" class="ml-2">{{ $t('common.cancel') }}</v-btn>
                   </v-col>
                 </v-row>
               </v-form>
@@ -284,21 +309,35 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import api from '@/utils/api';
+import { globalLang } from '@/composables/useLang';
 import { useAuth } from '@/composables/useAuth';
 
 const router = useRouter();
 const { isLoggedIn } = useAuth();
+const { t } = useI18n();
+const DRAFT_KEY = 'bento_order_draft';
+
+const loadDraft = () => {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return null;
+};
+
+const draft = loadDraft();
 
 const orderData = ref({
-  mealType: 'lunch',
-  items: {}
+  mealType: draft?.mealType || 'lunch',
+  items: draft?.items || {}
 });
 
 const orders = ref([]);
 const loading = ref(false);
 const menuItems = ref([]);
-const selectedVendor = ref('');
+const selectedVendor = ref(draft?.selectedVendor || '');
 
 // 便當時間設定（預設值；mount 後從 API 覆蓋）
 const bentoSettings = ref({ lunch_end: '10:30', dinner_start: '13:00', dinner_end: '16:00' });
@@ -326,15 +365,24 @@ const editData = ref({
 });
 const editLoading = ref(false);
 
+const localizedMenuItems = computed(() =>
+  menuItems.value.map(item => ({
+    ...item,
+    displayName: globalLang.value === 'id' ? (item.item_idname || item.item_name)
+               : globalLang.value === 'vi' ? (item.item_viname || item.item_name)
+               : item.item_name,
+  }))
+);
+
 const vendors = computed(() => {
-  return [...new Set(menuItems.value
+  return [...new Set(localizedMenuItems.value
     .map(item => String(item.vendor_name || '').trim())
     .filter(name => name.length > 0)
   )];
 });
 
 const filteredItems = computed(() => {
-  return menuItems.value.filter(item => item.vendor_name === selectedVendor.value);
+  return localizedMenuItems.value.filter(item => item.vendor_name === selectedVendor.value);
 });
 
 const totalAmount = computed(() => {
@@ -372,7 +420,7 @@ const todayOrders = computed(() => {
 });
 
 // 編輯相關計算屬性
-const editFilteredItems = computed(() => { return menuItems.value.filter(item => item.vendor_name === editData.value.selectedVendor); });
+const editFilteredItems = computed(() => { return localizedMenuItems.value.filter(item => item.vendor_name === editData.value.selectedVendor); });
 
 const editTotalAmount = computed(() => {
   return Object.entries(editData.value.items)
@@ -395,12 +443,34 @@ const availableMealTypes = computed(() => {
   const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
   const s = bentoSettings.value;
   const types = [];
-  if (nowMin <= toMin(s.lunch_end)) types.push({ label: '午餐', value: 'lunch' });
-  if (nowMin >= toMin(s.dinner_start) && nowMin < toMin(s.dinner_end)) types.push({ label: '晚餐', value: 'dinner' });
+  if (nowMin <= toMin(s.lunch_end)) types.push({ label: t('bento.lunch'), value: 'lunch' });
+  if (nowMin >= toMin(s.dinner_start) && nowMin < toMin(s.dinner_end)) types.push({ label: t('bento.dinner'), value: 'dinner' });
   return types;
 });
 
-const onVendorChange = () => { orderData.value.items = {}; }; // 清空之前的選擇
+// 所有已選品項（跨店家彙整）
+const selectedItemsSummary = computed(() => {
+  return Object.entries(orderData.value.items)
+    .filter(([, qty]) => qty > 0)
+    .map(([id, qty]) => {
+      const item = localizedMenuItems.value.find(i => String(i.id) === String(id));
+      if (!item) return null;
+      return { id, name: item.displayName, vendor: item.vendor_name, price: Number(item.price), quantity: qty };
+    })
+    .filter(Boolean);
+});
+
+const saveDraft = () => {
+  localStorage.setItem(DRAFT_KEY, JSON.stringify({
+    mealType: orderData.value.mealType,
+    items: orderData.value.items,
+    selectedVendor: selectedVendor.value
+  }));
+};
+
+const clearDraft = () => { localStorage.removeItem(DRAFT_KEY); };
+
+const onVendorChange = () => { /* 切換店家不清除其他店家已選品項 */ };
 
 const onEditVendorChange = () => { editData.value.items = {}; };  // 清空編輯時的選擇
 
@@ -416,7 +486,7 @@ const submitOrder = async () => {
     .filter(Boolean);
 
   if (items.length === 0) {
-    alert('請選擇餐點');
+    alert(t('bento.selectFoodFirst'));
     return;
   }
 
@@ -427,14 +497,14 @@ const submitOrder = async () => {
       items
     });
 
-    alert('訂購成功');
+    alert(t('bento.orderSuccess'));
     fetchOrders();
-    // 重置選擇
+    clearDraft();
     selectedVendor.value = '';
     orderData.value.items = {};
   } catch (err) {
     console.error('submitOrder error', err);
-    alert('訂購失敗: ' + err.response?.data?.error);
+    alert(t('bento.orderFailed', { error: err.response?.data?.error }));
   } finally {
     loading.value = false;
   }
@@ -444,12 +514,12 @@ const submitEdit = async () => {
   // 找到對應的訂單進行時間檢查
   const order = orders.value.find(o => o.id === editData.value.orderId);
   if (!order) {
-    alert('找不到訂單');
+    alert(t('bento.orderNotFound'));
     return;
   }
 
   if (!canEditOrder(order)) {
-    alert('已超過編輯時間，無法更新此訂單');
+    alert(t('bento.editTimeExpired'));
     editDialog.value = false;
     return;
   }
@@ -463,7 +533,7 @@ const submitEdit = async () => {
     .filter(Boolean);
 
   if (items.length === 0) {
-    alert('請選擇餐點');
+    alert(t('bento.selectFoodFirst'));
     return;
   }
 
@@ -474,12 +544,12 @@ const submitEdit = async () => {
       items
     });
 
-    alert('更新成功');
+    alert(t('bento.updateSuccess'));
     editDialog.value = false;
     fetchOrders();
   } catch (err) {
     console.error('更新訂單失敗', err);
-    alert('更新失敗: ' + err.response?.data?.error);
+    alert(t('bento.updateFailed', { error: err.response?.data?.error }));
   } finally {
     editLoading.value = false;
   }
@@ -510,7 +580,7 @@ const fetchOrders = async () => {
 
 const editOrder = (order) => {
   if (!canEditOrder(order)) {
-    alert('已超過編輯時間，無法編輯此訂單');
+    alert(t('bento.editTimeExpired'));
     return;
   }
 
@@ -549,18 +619,18 @@ const deleteOrder = async (id) => {
   }
 
   if (!canEditOrder(order)) {
-    alert('已超過刪除時間，無法刪除此訂單');
+    alert(t('bento.deleteTimeExpired'));
     return;
   }
 
-  if (!confirm('確定刪除?')) return;
+  if (!confirm(t('bento.deleteConfirm'))) return;
   try {
     await api.delete(`/bento/order/${id}`);
-    alert('刪除成功');
+    alert(t('bento.deleteSuccess'));
     fetchOrders();
   } catch (err) {
     console.error('刪除訂單失敗', err);
-    alert('刪除失敗');
+    alert(t('bento.deleteFailed'));
   }
 };
 
@@ -629,14 +699,15 @@ onMounted(() => {
 // 監聽可用餐點類型變化，自動設置默認值
 watch(availableMealTypes, (newTypes) => {
   if (newTypes.length > 0 && !newTypes.some(type => type.value === orderData.value.mealType)) { orderData.value.mealType = newTypes[0].value; }
-  // 如果當前選擇的餐點類型不在可用選項中，自動選擇第一個可用的
 }, { immediate: true });
+
+// 自動儲存訂購草稿
+watch([orderData, selectedVendor], saveDraft, { deep: true });
 </script>
 
 <style scoped>
 .bento-container {
-  max-width: 1100px;
-  margin: 0 auto;
+  max-width: 100%;
 }
 
 .total {

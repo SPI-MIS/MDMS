@@ -19,6 +19,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
 import Footer from '@/components/FooterPage.vue'
 import { ref, onMounted } from 'vue'
 import { useAutoLogout } from '@/composables/useAutoLogout'
+import api from '@/utils/api'
 
 const userId = ref('')
 const userName = ref('')
@@ -36,13 +37,17 @@ const updateUser = (payload) => {
   localStorage.setItem('admin', payload.admin)
 }
 
-onMounted(() => {
+const { restart: restartAutoLogout } = useAutoLogout({ timeout: 15 * 60 * 1000 })
+
+onMounted(async () => {
   userId.value = localStorage.getItem('userId') || ''
   userName.value = localStorage.getItem('userName') || ''
   manager.value = localStorage.getItem('manager') || ''
   admin.value = localStorage.getItem('admin') || ''
+  try {
+    const { data } = await api.get('/bento/settings')
+    const min = Number(data.auto_logout_timeout_min)
+    if (min > 0) restartAutoLogout(min * 60 * 1000)
+  } catch { /* 保留預設值 */ }
 })
-
-// 預設 15 分鐘，可改成 { timeout: 30 * 60 * 1000 } 例如 30 分鐘
-useAutoLogout({ timeout: 15 * 60 * 1000 })
 </script>

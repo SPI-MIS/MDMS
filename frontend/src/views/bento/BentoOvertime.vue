@@ -3,73 +3,148 @@
   <v-container fluid>
     <!-- 無權限 -->
     <v-alert v-if="!loading && !hasPermission" type="error" variant="tonal" class="mt-4">
-      您無加班便當訂購權限，請洽管理員申請。
+      {{ $t('bento.overtimeNoPermission') }}
     </v-alert>
 
     <template v-else-if="hasPermission">
       <div class="d-flex align-center mb-5 gap-3">
         <v-icon color="primary" size="28">mdi-food-takeout-box</v-icon>
-        <span class="text-h6 font-weight-bold">加班便當訂購</span>
+        <span class="text-h6 font-weight-bold">{{ $t('bento.overtime') }}</span>
         <v-chip size="small" color="secondary" variant="tonal">
           <v-icon start size="14">mdi-calendar</v-icon>
           {{ todayStr }}
         </v-chip>
+        <!-- 目前餐別顯示（依時間自動決定） -->
+        <v-chip
+          v-if="currentMealType"
+          size="small"
+          :color="currentMealType === 'lunch' ? 'orange' : 'blue'"
+          variant="tonal"
+        >
+          <v-icon start size="14">{{ currentMealType === 'lunch' ? 'mdi-white-balance-sunny' : 'mdi-weather-night' }}</v-icon>
+          {{ $t(currentMealType === 'lunch' ? 'bento.lunch' : 'bento.dinner') }}
+        </v-chip>
       </div>
+
+      <!-- 時間限制警告 -->
+      <v-alert
+        v-if="settingsLoaded && !currentMealType"
+        type="warning"
+        variant="tonal"
+        density="compact"
+        class="mb-4"
+      >
+        {{ $t('bento.orderTimeExpired') }}
+      </v-alert>
 
       <!-- ── 訂購明細 ── -->
       <v-card class="mb-4" elevation="1">
         <v-card-title class="text-body-1 font-weight-bold pa-4 pb-2">
           <v-icon start color="orange">mdi-silverware-fork-knife</v-icon>
-          訂購明細
+          {{ $t('bento.overtimeDetails') }}
         </v-card-title>
         <v-card-text class="pa-4 pt-2">
           <v-row
             v-for="(row, i) in orderRows"
             :key="i"
-            align="center"
-            class="mb-1"
+            align="start"
+            class="mb-3 row-divider"
             dense
           >
-            <!-- 餐別 -->
-            <v-col cols="12" sm="2">
-              <v-btn-toggle
-                v-model="row.mealType"
-                mandatory
-                density="compact"
-                variant="outlined"
-                color="primary"
-                class="w-100"
-              >
-                <v-btn value="lunch" size="small">
-                  <v-icon size="14" color="orange" class="me-1">mdi-white-balance-sunny</v-icon>午
-                </v-btn>
-                <v-btn value="dinner" size="small">
-                  <v-icon size="14" color="blue" class="me-1">mdi-weather-night</v-icon>晚
-                </v-btn>
-              </v-btn-toggle>
+            <!-- ① 人員類型 + 人員輸入（同一行） -->
+            <v-col cols="12" sm="3">
+              <div class="d-flex align-center gap-2">
+                <v-btn-toggle
+                  v-model="row.personType"
+                  mandatory
+                  density="compact"
+                  variant="outlined"
+                  color="primary"
+                  class="flex-shrink-0"
+                  @update:model-value="onPersonTypeChange(row)"
+                >
+                  <v-btn value="worker" size="small">{{ $t('bento.personWorker') }}</v-btn>
+                  <v-btn value="guest"  size="small">{{ $t('bento.personGuest') }}</v-btn>
+                  <v-btn value="vendor" size="small">{{ $t('bento.personVendor') }}</v-btn>
+                </v-btn-toggle>
+
+                <div style="width: 300px; min-width: 0; flex-shrink: 1">
+                  <!-- 加班者搜尋 -->
+                  <v-autocomplete
+                    v-if="row.personType === 'worker'"
+                    v-model="row._personModel"
+                    :search="row._personSearch"
+                    :items="row._personSuggestions"
+                    item-title="label"
+                    :label="$t('bento.searchEmployee')"
+                    density="compact"
+                    variant="outlined"
+                    no-filter
+                    return-object
+                    clearable
+                    :loading="row._personLoading"
+                    :error="!!row.itemName && !row.personId"
+                    hide-details="auto"
+                    @update:search="q => handlePersonSearch(row, q, 'employee')"
+                    @update:model-value="p => onPersonSelect(row, p)"
+                  />
+
+                  <!-- 廠商搜尋 -->
+                  <v-autocomplete
+                    v-else-if="row.personType === 'vendor'"
+                    v-model="row._personModel"
+                    :search="row._personSearch"
+                    :items="row._personSuggestions"
+                    item-title="label"
+                    :label="$t('bento.searchVendorRep')"
+                    density="compact"
+                    variant="outlined"
+                    no-filter
+                    return-object
+                    clearable
+                    :loading="row._personLoading"
+                    :error="!!row.itemName && !row.personId"
+                    hide-details="auto"
+                    @update:search="q => handlePersonSearch(row, q, 'vendor')"
+                    @update:model-value="p => onPersonSelect(row, p)"
+                  />
+
+                  <!-- 客人：人數輸入 -->
+                  <v-text-field
+                    v-else
+                    v-model.number="row.guestCount"
+                    type="number"
+                    min="1"
+                    :label="$t('bento.guestCount')"
+                    density="compact"
+                    variant="outlined"
+                    hide-details
+                  />
+                </div>
+              </div>
             </v-col>
 
-            <!-- 店家 -->
-            <v-col cols="12" sm="3">
+            <!-- ② 店家 -->
+            <v-col cols="12" sm="2">
               <v-select
                 v-model="row.vendorName"
                 :items="vendors"
-                label="店家"
+                :label="$t('bento.vendor')"
                 density="compact"
                 variant="outlined"
                 hide-details
-                @update:model-value="row.itemName = ''"
+                @update:model-value="() => { row.itemName = ''; row.price = 0; }"
               />
             </v-col>
 
-            <!-- 品項 -->
+            <!-- ③ 品項 -->
             <v-col cols="12" sm="3">
               <v-select
                 v-model="row.itemName"
                 :items="itemsFor(row.vendorName)"
-                item-title="item_name"
+                item-title="displayName"
                 item-value="item_name"
-                label="品項"
+                :label="$t('bento.item')"
                 density="compact"
                 variant="outlined"
                 hide-details
@@ -78,37 +153,35 @@
               />
             </v-col>
 
-            <!-- 數量 -->
-            <v-col cols="6" sm="2">
+            <!-- ④ 數量 + 小計 + 刪除 -->
+            <v-col cols="12" sm="3" class="d-flex align-start gap-2">
               <v-text-field
                 v-model.number="row.quantity"
                 type="number"
-                min="1"
-                label="數量"
+                :min="row.personType === 'worker' && row.quantityBy3 ? 3 : 1"
+                :step="row.personType === 'worker' && row.quantityBy3 ? 3 : 1"
+                :label="$t('bento.quantity')"
                 density="compact"
                 variant="outlined"
-                hide-details
+                style="max-width: 90px"
+                :error-messages="row.personType === 'worker' && row.quantityBy3 && row.quantity > 0 && row.quantity % 3 !== 0
+                  ? [$t('bento.quantityMustBeMultipleOf3')] : []"
+                hide-details="auto"
               />
-            </v-col>
-
-            <!-- 小計 -->
-            <v-col cols="4" sm="1" class="text-right">
-              <span class="text-primary font-weight-medium text-body-2">
-                ${{ row.price * (row.quantity || 0) }}
-              </span>
-            </v-col>
-
-            <!-- 刪除 -->
-            <v-col cols="2" sm="1" class="text-center">
-              <v-btn
-                icon="mdi-close"
-                variant="text"
-                color="error"
-                density="compact"
-                size="small"
-                :disabled="orderRows.length === 1"
-                @click="removeRow(i)"
-              />
+              <div class="d-flex align-center flex-1-1 justify-end gap-2 mt-1">
+                <span class="text-primary font-weight-medium text-body-2 text-no-wrap">
+                  ${{ row.price * (row.quantity || 0) }}
+                </span>
+                <v-btn
+                  icon="mdi-close"
+                  variant="text"
+                  color="error"
+                  density="compact"
+                  size="small"
+                  :disabled="orderRows.length === 1"
+                  @click="removeRow(i)"
+                />
+              </div>
             </v-col>
           </v-row>
 
@@ -120,72 +193,22 @@
             class="mt-2"
             @click="addRow"
           >
-            新增一筆
+            {{ $t('bento.addRow') }}
           </v-btn>
         </v-card-text>
 
         <!-- 合計列 -->
         <v-divider />
         <div class="d-flex justify-end align-center pa-4 gap-4">
-          <span class="text-body-2 text-medium-emphasis">訂購合計</span>
+          <span class="text-body-2 text-medium-emphasis">{{ $t('bento.grandTotal') }}</span>
           <v-chip color="primary" size="large" class="font-weight-bold">${{ grandTotal }}</v-chip>
         </div>
-      </v-card>
-
-      <!-- ── 加班人員 ── -->
-      <v-card class="mb-4" elevation="1">
-        <v-card-title class="text-body-1 font-weight-bold pa-4 pb-2">
-          <v-icon start color="secondary">mdi-account-group</v-icon>
-          加班人員 / 客人(Guest) / 廠商
-          <span class="text-caption text-medium-emphasis ms-2">（輸入工號 / Guest / 廠商編號後按 Enter 新增）</span>
-        </v-card-title>
-        <v-card-text class="pa-4 pt-2">
-          <!-- 已新增的人員 chips -->
-          <div v-if="overtimeWorkers.length" class="mb-3 d-flex flex-wrap gap-2">
-            <v-chip
-              v-for="(w, i) in overtimeWorkers"
-              :key="w.id"
-              closable
-              color="secondary"
-              variant="tonal"
-              @click:close="overtimeWorkers.splice(i, 1)"
-            >
-              <v-icon start size="14">mdi-account</v-icon>
-              {{ w.id }} {{ w.name }}
-            </v-chip>
-          </div>
-
-          <!-- 工號輸入 -->
-          <div class="d-flex gap-2 align-start">
-            <v-text-field
-              v-model="empInput"
-              label="輸入工號 / 廠商代號"
-              density="compact"
-              variant="outlined"
-              hide-details="auto"
-              :error-messages="empError"
-              style="max-width: 240px; text-transform: uppercase"
-              autocapitalize="characters"
-              autocorrect="off"
-              @keyup.enter="lookupEmployee"
-              @input="empInput = empInput.toUpperCase(); empError = ''"
-            />
-            <v-btn
-              variant="tonal"
-              color="secondary"
-              :loading="empLooking"
-              @click="lookupEmployee"
-            >
-              新增
-            </v-btn>
-          </div>
-        </v-card-text>
       </v-card>
 
       <!-- ── 備註 ── -->
       <v-card class="mb-5" elevation="1">
         <v-card-title class="text-body-1 font-weight-bold pa-4 pb-2">
-          <v-icon start color="grey">mdi-note-text</v-icon>備註
+          <v-icon start color="grey">mdi-note-text</v-icon>{{ $t('bento.remark') }}
         </v-card-title>
         <v-card-text class="pa-4 pt-2">
           <v-textarea
@@ -193,14 +216,14 @@
             variant="outlined"
             rows="3"
             hide-details
-            placeholder="如有其他說明請填寫於此"
+            :placeholder="$t('bento.remarkPlaceholder')"
           />
         </v-card-text>
       </v-card>
 
       <!-- ── 提交 ── -->
       <div class="d-flex justify-end gap-3">
-        <v-btn variant="text" @click="resetForm">清除</v-btn>
+        <v-btn variant="text" @click="resetForm">{{ $t('bento.clear') }}</v-btn>
         <v-btn
           color="primary"
           size="large"
@@ -209,7 +232,7 @@
           :disabled="!canSubmit"
           @click="submitOrder"
         >
-          送出訂購
+          {{ $t('bento.submitOvertimeOrder') }}
         </v-btn>
       </div>
     </template>
@@ -218,93 +241,133 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import api from '@/utils/api';
+import { globalLang } from '@/composables/useLang';
 
-// ── 狀態 ──────────────────────────────────────────────
-const loading = ref(true);
-const hasPermission = ref(false);
-const menuItems = ref([]);
-const submitting = ref(false);
+const { t } = useI18n();
 
-// ── 日期 ──────────────────────────────────────────────
+const loading        = ref(true);
+const hasPermission  = ref(false);
+const menuItems      = ref([]);
+const submitting     = ref(false);
+const settingsLoaded = ref(false);
+const settings       = ref({});
+
 const todayStr = (() => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 })();
 
-// ── 菜單 ──────────────────────────────────────────────
-const vendors = computed(() => [...new Set(menuItems.value.map(i => i.vendor_name))]);
+// ── 菜單（多語系） ─────────────────────────────────────
+const localizedMenuItems = computed(() =>
+  menuItems.value.map(item => ({
+    ...item,
+    displayName: globalLang.value === 'id' ? (item.item_idname || item.item_name)
+               : globalLang.value === 'vi' ? (item.item_viname || item.item_name)
+               : item.item_name,
+  }))
+);
 
-const itemsFor = (vendorName) => menuItems.value.filter(i => i.vendor_name === vendorName);
+const vendors  = computed(() => [...new Set(localizedMenuItems.value.map(i => i.vendor_name))]);
+const itemsFor = (vendorName) => localizedMenuItems.value.filter(i => i.vendor_name === vendorName);
 
 const setPrice = (row, itemName) => {
   const found = menuItems.value.find(i => i.item_name === itemName && i.vendor_name === row.vendorName);
-  row.price = found ? Number(found.price) : 0;
+  row.price       = found ? Number(found.price) : 0;
+  row.quantityBy3 = found ? !!found.quantity_by_3 : false;
 };
 
-// ── 訂購明細列 ────────────────────────────────────────
-const makeRow = () => ({ mealType: 'lunch', vendorName: '', itemName: '', price: 0, quantity: 1 });
+// ── 依當前時間自動決定餐別（null = 不在訂購窗口） ───────
+const currentMealType = computed(() => {
+  const s = settings.value;
+  if (!s.lunch_end) return null; // 設定尚未載入
+  const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
+  const [h, m] = fmt.format(new Date()).split(':').map(Number);
+  const now   = h * 60 + m;
+  const toMin = ts => { const [hh, mm] = (ts || '00:00').split(':').map(Number); return hh * 60 + mm; };
+  if (now <= toMin(s.lunch_end)) return 'lunch';
+  if (now >= toMin(s.dinner_start || '13:00') && now < toMin(s.dinner_end || '16:00')) return 'dinner';
+  return null;
+});
+
+// ── 每列資料 ──────────────────────────────────────────
+const makeRow = () => ({
+  personType:  'worker',  // 'worker' | 'guest' | 'vendor'
+  personId:    '',
+  personName:  '',
+  guestCount:  1,
+  _personModel:       null,
+  _personSearch:      '',
+  _personSuggestions: [],
+  _personLoading:     false,
+  vendorName:  '',
+  itemName:    '',
+  price:       0,
+  quantity:    1,
+  quantityBy3: false,     // 由所選品項的 quantity_by_3 決定
+});
+
 const orderRows = ref([makeRow()]);
-const addRow = () => orderRows.value.push(makeRow());
+const addRow    = () => orderRows.value.push(makeRow());
 const removeRow = (i) => orderRows.value.splice(i, 1);
 
 const grandTotal = computed(() =>
   orderRows.value.reduce((s, r) => s + r.price * (r.quantity || 0), 0)
 );
 
-// ── 加班人員 ──────────────────────────────────────────
-const overtimeWorkers = ref([]);
-const empInput = ref('');
-const empError = ref('');
-const empLooking = ref(false);
+// ── 人員類型切換 ──────────────────────────────────────
+const onPersonTypeChange = (row) => {
+  row.personId        = '';
+  row.personName      = '';
+  row._personModel    = null;
+  row._personSearch   = '';
+  row._personSuggestions = [];
+  row.guestCount      = 1;
+  row.quantity    = 1;
+  row.quantityBy3 = false;
+};
 
-const lookupEmployee = async () => {
-  const q = empInput.value.trim();
-  if (!q) return;
-  if (overtimeWorkers.value.some(w => w.id === q)) {
-    empError.value = '已在清單中';
-    return;
-  }
-  // 輸入 GUEST 直接加入，不查資料庫
-  if (q === 'GUEST') {
-    overtimeWorkers.value.push({ id: 'GUEST', name: '客人' });
-    empInput.value = '';
-    return;
-  }
-  empLooking.value = true;
-  empError.value = '';
-  try {
-    // 同時搜尋員工（CMSMV）與廠商（PURMA）
-    const [empRes, vendorRes] = await Promise.all([
-      api.get('/bento/employee/search', { params: { q } }).catch(() => ({ data: [] })),
-      api.get('/bento/vendor/search',   { params: { q } }).catch(() => ({ data: [] })),
-    ]);
+// ── 人員搜尋（WeakMap 以 row 物件為 key 儲存 debounce timer） ──
+const searchTimers = new WeakMap();
 
-    const exactEmp    = empRes.data.find(r => r.id === q);
-    const exactVendor = vendorRes.data.find(r => r.id === q);
+// 中文字元 → 搜尋名稱；英文/數字 → 搜尋編號
+const detectSearchBy = (q) => /[一-鿿㐀-䶿]/.test(q) ? 'name' : 'id';
 
-    if (exactEmp) {
-      overtimeWorkers.value.push({ id: exactEmp.id, name: exactEmp.name });
-      empInput.value = '';
-    } else if (exactVendor) {
-      overtimeWorkers.value.push({ id: exactVendor.id, name: exactVendor.name });
-      empInput.value = '';
-    } else if (empRes.data.length === 1 && vendorRes.data.length === 0) {
-      overtimeWorkers.value.push({ id: empRes.data[0].id, name: empRes.data[0].name });
-      empInput.value = '';
-    } else if (vendorRes.data.length === 1 && empRes.data.length === 0) {
-      overtimeWorkers.value.push({ id: vendorRes.data[0].id, name: vendorRes.data[0].name });
-      empInput.value = '';
-    } else if (empRes.data.length === 0 && vendorRes.data.length === 0) {
-      empError.value = `找不到工號或廠商代號「${q}」`;
-    } else {
-      const total = empRes.data.length + vendorRes.data.length;
-      empError.value = `請輸入完整代號（員工 ${empRes.data.length} 筆、廠商 ${vendorRes.data.length} 筆，共 ${total} 筆）`;
+const handlePersonSearch = (row, q, type) => {
+  const upper = q ? q.toUpperCase() : q;
+  row._personSearch = upper;
+  onPersonSearch(row, upper, type);
+};
+
+const onPersonSearch = (row, q, type) => {
+  q = (q || '').trim();
+  if (searchTimers.has(row)) clearTimeout(searchTimers.get(row));
+  if (!q || q.length < 2) { row._personSuggestions = []; return; }
+
+  const by = detectSearchBy(q);
+
+  searchTimers.set(row, setTimeout(async () => {
+    row._personLoading = true;
+    try {
+      const endpoint = type === 'employee' ? '/bento/employee/search' : '/bento/vendor/search';
+      const { data } = await api.get(endpoint, { params: { q, by } }).catch(() => ({ data: [] }));
+      row._personSuggestions = data.map(e => ({ id: e.id, name: e.name, label: `${e.id}　${e.name}` }));
+    } finally {
+      row._personLoading = false;
     }
-  } catch {
-    empError.value = '查詢失敗';
-  } finally {
-    empLooking.value = false;
+  }, 200));
+};
+
+const onPersonSelect = (row, person) => {
+  if (person) {
+    row.personId   = person.id;
+    row.personName = person.name;
+  } else {
+    // clearable × 點擊
+    row.personId          = '';
+    row.personName        = '';
+    row._personSuggestions = [];
   }
 };
 
@@ -312,33 +375,40 @@ const lookupEmployee = async () => {
 const remark = ref('');
 
 // ── 驗證 ──────────────────────────────────────────────
-const canSubmit = computed(() =>
-  orderRows.value.some(r => r.itemName && r.quantity > 0)
-);
+const canSubmit = computed(() => {
+  if (!currentMealType.value) return false; // 不在訂購時間內
+  const valid = orderRows.value.filter(r => r.itemName && r.quantity > 0);
+  if (!valid.length) return false;
+  return valid.every(r => {
+    if (r.personType === 'worker') return !!r.personId && (!r.quantityBy3 || r.quantity % 3 === 0);
+    if (r.personType === 'vendor') return !!r.personId;                          // 必選廠商
+    return true; // guest 只需人數
+  });
+});
 
 // ── 送出 ──────────────────────────────────────────────
 const submitOrder = async () => {
   const items = orderRows.value
     .filter(r => r.itemName && r.quantity > 0)
     .map(r => ({
-      mealType: r.mealType,
+      mealType:   currentMealType.value, // 依當前時間自動決定
+      personType: r.personType,
+      personId:   r.personId,
+      personName: r.personName,
+      guestCount: r.personType === 'guest' ? (r.guestCount || 1) : 0,
       vendorName: r.vendorName,
-      itemName: r.itemName,
-      price: r.price,
-      quantity: r.quantity,
+      itemName:   r.itemName,
+      price:      r.price,
+      quantity:   r.quantity,
     }));
 
   submitting.value = true;
   try {
-    await api.post('/bento/overtime/order', {
-      items,
-      overtimeWorkers: overtimeWorkers.value,
-      remark: remark.value,
-    });
-    alert('訂購成功！');
+    await api.post('/bento/overtime/order', { items, remark: remark.value });
+    alert(t('bento.overtimeSuccess'));
     resetForm();
   } catch (err) {
-    alert('訂購失敗：' + (err.response?.data?.error || err.message));
+    alert(t('bento.overtimeFailed', { error: err.response?.data?.error || err.message }));
   } finally {
     submitting.value = false;
   }
@@ -346,31 +416,38 @@ const submitOrder = async () => {
 
 const resetForm = () => {
   orderRows.value = [makeRow()];
-  overtimeWorkers.value = [];
-  remark.value = '';
-  empInput.value = '';
-  empError.value = '';
+  remark.value    = '';
 };
 
 // ── 初始化 ────────────────────────────────────────────
 onMounted(async () => {
   try {
-    const [permRes, menuRes] = await Promise.all([
-      api.get('/bento/overtime/permission'),
-      api.get('/bento/menu'),
-    ]);
+    const permRes    = await api.get('/bento/overtime/permission');
     hasPermission.value = permRes.data.hasPermission;
-    menuItems.value = menuRes.data;
   } catch {
     hasPermission.value = false;
   } finally {
     loading.value = false;
   }
+  try {
+    const [menuRes, settingsRes] = await Promise.all([
+      api.get('/bento/menu', { params: { overtime: '1' } }),
+      api.get('/bento/settings'),
+    ]);
+    menuItems.value      = menuRes.data;
+    settings.value       = settingsRes.data;
+    settingsLoaded.value = true;
+  } catch { /* 菜單或設定載入失敗不影響權限 */ }
 });
 </script>
 
 <style scoped>
 .gap-2 { gap: 8px; }
-.gap-3 { gap: 12px; }
+.gap-3 { gap: 12px; }位
 .gap-4 { gap: 16px; }
+.flex-1-1 { flex: 1 1 0; min-width: 0; }
+.row-divider {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding-bottom: 10px;
+}
 </style>

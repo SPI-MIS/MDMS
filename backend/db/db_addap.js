@@ -9,7 +9,8 @@ const pool = mysql.createPool({
   password: process.env.MYDB_PASS,
   database: process.env.MYDB_addap,
   waitForConnections: true,
-  connectionLimit: 10
+  connectionLimit: 10,
+  timezone: '+08:00'
 })
 
 module.exports = pool

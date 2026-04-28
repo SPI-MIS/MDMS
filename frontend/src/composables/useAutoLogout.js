@@ -12,12 +12,12 @@ export function useAutoLogout({ timeout = 15 * 60 * 1000, checkInterval = 1000 }
   const storageHandler = (e) => { if (e.key === 'lastActivity') /* 同步跨分頁活動時間 */ null }
 
   let intervalId = null
+  let effectiveTimeout = timeout
 
   const check = () => {
     if (!isLoggedIn.value) return
     const last = Number(localStorage.getItem('lastActivity') || Date.now())
-    if (Date.now() - last >= timeout) {
-      // 自動登出並導回 /login
+    if (Date.now() - last >= effectiveTimeout) {
       try { logout() } catch (e) { /* ignore */ }
       router.push('/login')
       localStorage.removeItem('lastActivity')
@@ -39,17 +39,19 @@ export function useAutoLogout({ timeout = 15 * 60 * 1000, checkInterval = 1000 }
     window.removeEventListener('storage', storageHandler)
   }
 
-  onMounted(() => {
-    start()
-  })
-
-  onBeforeUnmount(() => {
+  const restart = (newTimeout) => {
+    effectiveTimeout = newTimeout
     stop()
-  })
+    start()
+  }
 
-  // 若登入狀態改變，立即重置或清除
+  onMounted(() => { start() })
+  onBeforeUnmount(() => { stop() })
+
   watch(isLoggedIn, (v) => {
     if (v) resetHandler()
     else localStorage.removeItem('lastActivity')
   })
+
+  return { restart }
 }

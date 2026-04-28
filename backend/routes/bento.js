@@ -18,7 +18,7 @@ const { sql: mssql, getPool: getSPIPool } = require('../db/db_SPI');
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `)
-    const defaults = [['lunch_end', '10:30'], ['dinner_start', '13:00'], ['dinner_end', '16:00']]
+    const defaults = [['lunch_end', '10:30'], ['dinner_start', '13:00'], ['dinner_end', '16:00'], ['auto_logout_timeout_min', '15']]
     for (const [key, value] of defaults) {
       await pool.query(
         'INSERT IGNORE INTO bento_settings (setting_key, setting_value) VALUES (?, ?)',
@@ -89,6 +89,38 @@ const { sql: mssql, getPool: getSPIPool } = require('../db/db_SPI');
       console.log('[bento] 遷移完成，items 欄位已移除')
     }
 
+    // bento_vendors 加上 is_active 欄位（若不存在）
+    const [isActiveCols] = await pool.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bento_vendors' AND COLUMN_NAME = 'is_active'
+    `)
+    if (isActiveCols.length === 0) {
+      await pool.query('ALTER TABLE bento_vendors ADD COLUMN is_active TINYINT NOT NULL DEFAULT 1')
+      console.log('[bento] bento_vendors.is_active 欄位已新增')
+    }
+
+    // bento_menu 語系欄位合併：item_name / item_viname / item_idname → item_name JSON
+    // 若 item_viname 欄位仍存在，代表尚未合併
+    const [viMergeCols] = await pool.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bento_menu' AND COLUMN_NAME = 'item_viname'
+    `)
+    if (viMergeCols.length > 0) {
+      console.log('[bento] 開始合併 bento_menu 語系欄位至 item_name JSON...')
+      await pool.query(`ALTER TABLE bento_menu MODIFY COLUMN item_name VARCHAR(600) NOT NULL`)
+      await pool.query(`
+        UPDATE bento_menu
+        SET item_name = JSON_OBJECT(
+          'zh-TW', item_name,
+          'vi',    IFNULL(item_viname, ''),
+          'id',    IFNULL(item_idname, '')
+        )
+      `)
+      await pool.query(`ALTER TABLE bento_menu DROP COLUMN item_viname`)
+      await pool.query(`ALTER TABLE bento_menu DROP COLUMN item_idname`)
+      console.log('[bento] bento_menu.item_name 已合併為 JSON 格式，舊欄位已移除')
+    }
+
     // 加班便當訂購權限表（誰可以下訂）
     await pool.query(`
       CREATE TABLE IF NOT EXISTS bento_overtime_permission (
@@ -117,11 +149,55 @@ const { sql: mssql, getPool: getSPIPool } = require('../db/db_SPI');
         id INT AUTO_INCREMENT PRIMARY KEY,
         created_by VARCHAR(50) NOT NULL,
         order_date DATE NOT NULL,
-        overtime_workers TEXT,
         remark TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `)
+
+    // 加班便當人員表（與訂單分離）
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bento_overtime_order_workers (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        overtime_order_id INT NOT NULL,
+        worker_id VARCHAR(50) NOT NULL,
+        worker_name VARCHAR(100) NOT NULL,
+        FOREIGN KEY (overtime_order_id) REFERENCES bento_overtime_orders(id) ON DELETE CASCADE
+      )
+    `)
+
+    // 遷移舊的 overtime_workers JSON 欄位 → 新資料表
+    const [owCols] = await pool.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bento_overtime_orders' AND COLUMN_NAME = 'overtime_workers'
+    `)
+    if (owCols.length > 0) {
+      const [oldOrders] = await pool.query(
+        'SELECT id, overtime_workers FROM bento_overtime_orders WHERE overtime_workers IS NOT NULL AND overtime_workers != ""'
+      )
+      for (const order of oldOrders) {
+        try {
+          const workers = JSON.parse(order.overtime_workers || '[]')
+          if (!Array.isArray(workers) || workers.length === 0) continue
+          const [existing] = await pool.query(
+            'SELECT COUNT(*) AS cnt FROM bento_overtime_order_workers WHERE overtime_order_id = ?',
+            [order.id]
+          )
+          if (existing[0].cnt > 0) continue
+          for (const w of workers) {
+            if (w.id && w.name) {
+              await pool.query(
+                'INSERT INTO bento_overtime_order_workers (overtime_order_id, worker_id, worker_name) VALUES (?, ?, ?)',
+                [order.id, w.id, w.name]
+              )
+            }
+          }
+        } catch (e) {
+          console.error('[bento] 遷移加班人員失敗 order', order.id, e.message)
+        }
+      }
+      await pool.query('ALTER TABLE bento_overtime_orders DROP COLUMN overtime_workers')
+      console.log('[bento] overtime_workers JSON 欄位已遷移至 bento_overtime_order_workers')
+    }
 
     // 加班便當訂購明細
     await pool.query(`
@@ -136,6 +212,52 @@ const { sql: mssql, getPool: getSPIPool } = require('../db/db_SPI');
         FOREIGN KEY (overtime_order_id) REFERENCES bento_overtime_orders(id) ON DELETE CASCADE
       )
     `)
+
+    // 加班便當品項新增人員欄位（person_type / person_id / person_name / guest_count）
+    const [personTypeCols] = await pool.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bento_overtime_order_items' AND COLUMN_NAME = 'person_type'
+    `)
+    if (personTypeCols.length === 0) {
+      await pool.query(`
+        ALTER TABLE bento_overtime_order_items
+          ADD COLUMN person_type  VARCHAR(20)  NOT NULL DEFAULT 'worker',
+          ADD COLUMN person_id    VARCHAR(50)  NOT NULL DEFAULT '',
+          ADD COLUMN person_name  VARCHAR(100) NOT NULL DEFAULT '',
+          ADD COLUMN guest_count  INT          NOT NULL DEFAULT 0
+      `)
+      console.log('[bento] bento_overtime_order_items person fields added')
+    }
+
+    // bento_menu 新增 for_overtime 欄位（標記加班便當可選品項）
+    const [forOTCols] = await pool.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bento_menu' AND COLUMN_NAME = 'for_overtime'
+    `)
+    if (forOTCols.length === 0) {
+      await pool.query('ALTER TABLE bento_menu ADD COLUMN for_overtime TINYINT NOT NULL DEFAULT 0')
+      console.log('[bento] bento_menu.for_overtime 欄位已新增')
+    }
+
+    // bento_menu 新增 quantity_by_3 欄位（加班者訂此品項時數量需為 3 的倍數）
+    const [qBy3Cols] = await pool.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bento_menu' AND COLUMN_NAME = 'quantity_by_3'
+    `)
+    if (qBy3Cols.length === 0) {
+      await pool.query('ALTER TABLE bento_menu ADD COLUMN quantity_by_3 TINYINT NOT NULL DEFAULT 0')
+      console.log('[bento] bento_menu.quantity_by_3 欄位已新增')
+    }
+
+    // bento_overtime_eligible 新增 can_view_summary 欄位（可查看匯總頁）
+    const [cvsCols] = await pool.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bento_overtime_eligible' AND COLUMN_NAME = 'can_view_summary'
+    `)
+    if (cvsCols.length === 0) {
+      await pool.query('ALTER TABLE bento_overtime_eligible ADD COLUMN can_view_summary TINYINT NOT NULL DEFAULT 0')
+      console.log('[bento] bento_overtime_eligible.can_view_summary 欄位已新增')
+    }
   } catch (err) {
     console.error('[bento] 初始化錯誤:', err.message)
   }
@@ -157,7 +279,9 @@ async function getSettings() {
 async function isValidOrderTime(mealType) {
   const s = await getSettings()
   const now = new Date()
-  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false })
+  const [h, m] = fmt.format(now).split(':').map(Number)
+  const nowMin = h * 60 + m
   const toMin = t => { const [h, m] = (t || '00:00').split(':').map(Number); return h * 60 + m }
 
   if (mealType === 'lunch') return nowMin <= toMin(s.lunch_end || '10:30')
@@ -222,21 +346,110 @@ router.post('/order', async (req, res) => {
 
 // 取得菜單（供應商+品項）
 router.get('/menu', async (req, res) => {
-  console.log('📋 Menu route called', req.method, req.originalUrl);
   try {
-    console.log('📋 Menu query start');
+    const forOvertime = req.query.overtime === '1';
+    const overtimeWhere = forOvertime ? ' AND IFNULL(m.for_overtime, 0) = 1' : '';
     const [rows] = await pool.query(`
-      SELECT m.id, m.vendor_id, v.name AS vendor_name, m.item_name, m.price
+      SELECT m.id, m.vendor_id, v.name AS vendor_name, m.item_name, m.price,
+             IFNULL(m.for_overtime, 0) AS for_overtime, IFNULL(m.quantity_by_3, 0) AS quantity_by_3
       FROM bento_menu m
       JOIN bento_vendors v ON m.vendor_id = v.id
+      WHERE IFNULL(v.is_active, 1) = 1${overtimeWhere}
       ORDER BY v.name, m.item_name
     `);
-    console.log('📋 Menu query done, records:', rows.length);
-    res.json(rows);
+    res.json(rows.map(row => {
+      let nameZh = row.item_name, nameVi = '', nameId = '';
+      try {
+        const obj = JSON.parse(row.item_name);
+        if (obj && typeof obj === 'object') {
+          nameZh = obj['zh-TW'] || row.item_name;
+          nameVi = obj['vi']    || '';
+          nameId = obj['id']    || '';
+        }
+      } catch { /* 舊格式純文字，照原樣使用 */ }
+      return { ...row, item_name: nameZh, item_viname: nameVi, item_idname: nameId };
+    }));
   } catch (err) {
     console.error('📋 Menu route error:', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 品項管理（管理後台用）
+// ─────────────────────────────────────────────────────────────────────────────
+
+function parseItemName(raw) {
+  let nameZh = raw, nameVi = '', nameId = '';
+  try {
+    const obj = JSON.parse(raw);
+    if (obj && typeof obj === 'object') {
+      nameZh = obj['zh-TW'] || raw;
+      nameVi = obj['vi']    || '';
+      nameId = obj['id']    || '';
+    }
+  } catch { /* 純文字 */ }
+  return { nameZh, nameVi, nameId };
+}
+
+// 取得指定店家品項（管理用）
+router.get('/menu-items', async (req, res) => {
+  const user = req.user;
+  if (!hasPermission(user)) return res.status(403).json({ error: '無權限' });
+  const { vendor_id } = req.query;
+  try {
+    let q = 'SELECT id, vendor_id, item_name, price, IFNULL(for_overtime, 0) AS for_overtime, IFNULL(quantity_by_3, 0) AS quantity_by_3 FROM bento_menu';
+    const params = [];
+    if (vendor_id) { q += ' WHERE vendor_id = ?'; params.push(vendor_id); }
+    q += ' ORDER BY id';
+    const [rows] = await pool.query(q, params);
+    res.json(rows.map(r => {
+      const { nameZh, nameVi, nameId } = parseItemName(r.item_name);
+      return { id: r.id, vendor_id: r.vendor_id, price: r.price, for_overtime: r.for_overtime, quantity_by_3: r.quantity_by_3, item_name_zh: nameZh, item_name_vi: nameVi, item_name_id: nameId };
+    }));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 新增品項
+router.post('/menu-item', async (req, res) => {
+  const user = req.user;
+  if (!hasPermission(user)) return res.status(403).json({ error: '無權限' });
+  const { vendor_id, item_name_zh, item_name_vi = '', item_name_id = '', price, for_overtime = 0, quantity_by_3 = 0 } = req.body;
+  if (!vendor_id || !item_name_zh || price == null) return res.status(400).json({ error: '請提供 vendor_id, item_name_zh, price' });
+  const itemName = JSON.stringify({ 'zh-TW': item_name_zh, 'vi': item_name_vi, 'id': item_name_id });
+  try {
+    const [result] = await pool.query(
+      'INSERT INTO bento_menu (vendor_id, item_name, price, for_overtime, quantity_by_3) VALUES (?, ?, ?, ?, ?)',
+      [vendor_id, itemName, price, for_overtime ? 1 : 0, quantity_by_3 ? 1 : 0]
+    );
+    res.json({ success: true, id: result.insertId });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 更新品項
+router.put('/menu-item/:id', async (req, res) => {
+  const user = req.user;
+  if (!hasPermission(user)) return res.status(403).json({ error: '無權限' });
+  const { item_name_zh, item_name_vi = '', item_name_id = '', price, for_overtime = 0, quantity_by_3 = 0 } = req.body;
+  if (!item_name_zh || price == null) return res.status(400).json({ error: '請提供 item_name_zh, price' });
+  const itemName = JSON.stringify({ 'zh-TW': item_name_zh, 'vi': item_name_vi, 'id': item_name_id });
+  try {
+    await pool.query(
+      'UPDATE bento_menu SET item_name = ?, price = ?, for_overtime = ?, quantity_by_3 = ? WHERE id = ?',
+      [itemName, price, for_overtime ? 1 : 0, quantity_by_3 ? 1 : 0, req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// 刪除品項
+router.delete('/menu-item/:id', async (req, res) => {
+  const user = req.user;
+  if (!hasPermission(user)) return res.status(403).json({ error: '無權限' });
+  try {
+    await pool.query('DELETE FROM bento_menu WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // 獲取用戶訂單
@@ -419,11 +632,22 @@ router.get('/summary/monthly', async (req, res) => {
       ORDER BY bo.user_id, bo.order_date, bo.meal_type, boi.vendor_name, boi.item_name
     `, [year, month]);
 
-    // 在 JS 組成 user → daily_orders 巢狀結構
+    // 查詢所有訂購人的姓名與所屬組別（部門）
+    const allUserIds = [...new Set(rows.map(r => r.user_id))];
+    const userInfo = await getUserInfo(allUserIds);
+
+    // 組成 user → daily_orders 巢狀結構
     const userMap = {};
     for (const row of rows) {
       if (!userMap[row.user_id]) {
-        userMap[row.user_id] = { user_id: row.user_id, total_amount: 0, daily_orders: {} };
+        const info = userInfo[row.user_id] || { name: '', dept: '未分類' };
+        userMap[row.user_id] = {
+          user_id: row.user_id,
+          user_name: info.name,
+          group_name: info.dept,
+          total_amount: 0,
+          daily_orders: {}
+        };
       }
       const u = userMap[row.user_id];
       u.total_amount += Number(row.price) * Number(row.quantity);
@@ -442,12 +666,29 @@ router.get('/summary/monthly', async (req, res) => {
       u.daily_orders[key].day_amount += Number(row.price) * Number(row.quantity);
     }
 
-    res.json(Object.values(userMap).map(u => ({
-      user_id: u.user_id,
-      order_count: Object.keys(u.daily_orders).length,
-      total_amount: u.total_amount,
-      daily_orders: Object.values(u.daily_orders)
-    })).sort((a, b) => b.total_amount - a.total_amount));
+    // 按組別分群
+    const groupMap = {};
+    for (const u of Object.values(userMap)) {
+      const gName = u.group_name;
+      if (!groupMap[gName]) groupMap[gName] = { group_name: gName, total_amount: 0, users: [] };
+      groupMap[gName].total_amount += u.total_amount;
+      groupMap[gName].users.push({
+        user_id: u.user_id,
+        user_name: u.user_name,
+        order_count: Object.keys(u.daily_orders).length,
+        total_amount: u.total_amount,
+        daily_orders: Object.values(u.daily_orders)
+      });
+    }
+
+    const result = Object.values(groupMap)
+      .sort((a, b) => a.group_name.localeCompare(b.group_name, 'zh-TW'))
+      .map(g => ({
+        ...g,
+        users: g.users.sort((a, b) => b.total_amount - a.total_amount)
+      }));
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -843,6 +1084,33 @@ router.post('/export', async (req, res) => {
   }
 });
 
+// 列出所有店家（含啟用狀態）
+router.get('/vendors', async (req, res) => {
+  const user = req.user
+  if (!hasPermission(user)) return res.status(403).json({ error: '無權限' })
+  try {
+    const [rows] = await pool.query('SELECT id, name, IFNULL(is_active, 1) AS is_active FROM bento_vendors ORDER BY name')
+    res.json(rows)
+  } catch (err) {
+    console.error('[bento] GET /vendors error:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// 切換店家啟用狀態
+router.patch('/vendor/:id/active', async (req, res) => {
+  const user = req.user
+  if (!hasPermission(user)) return res.status(403).json({ error: '無權限' })
+  const { is_active } = req.body
+  if (is_active == null) return res.status(400).json({ error: '請提供 is_active' })
+  try {
+    await pool.query('UPDATE bento_vendors SET is_active = ? WHERE id = ?', [is_active ? 1 : 0, req.params.id])
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // 取得便當時間設定（公開，前端用）
 router.get('/settings', async (_req, res) => {
   try {
@@ -857,9 +1125,11 @@ router.put('/settings', async (req, res) => {
   const user = req.user
   if (!user || user.SA004 !== 'manager') return res.status(403).json({ error: '無權限' })
 
-  const { lunch_end, dinner_start, dinner_end } = req.body
-  const entries = [['lunch_end', lunch_end], ['dinner_start', dinner_start], ['dinner_end', dinner_end]]
-    .filter(([, v]) => v)
+  const { lunch_end, dinner_start, dinner_end, auto_logout_timeout_min } = req.body
+  const entries = [
+    ['lunch_end', lunch_end], ['dinner_start', dinner_start], ['dinner_end', dinner_end],
+    ['auto_logout_timeout_min', auto_logout_timeout_min]
+  ].filter(([, v]) => v != null && v !== '')
 
   if (entries.length === 0) return res.status(400).json({ error: '未提供任何設定值' })
 
@@ -963,7 +1233,7 @@ router.get('/summary/department', async (req, res) => {
   }
 });
 
-// 加班便當日期區間匯總（以加班人員部門為組）
+// 加班便當日期區間匯總（以部門為大分類）
 router.get('/overtime/summary', async (req, res) => {
   const user = req.user;
   if (!hasPermission(user)) return res.status(403).json({ error: '無權限' });
@@ -975,73 +1245,88 @@ router.get('/overtime/summary', async (req, res) => {
   if (diffDays > 30) return res.status(400).json({ error: '日期區間最長 31 天' });
 
   try {
+    // 查詢品項（含人員欄位，舊資料用 IFNULL 提供預設值）
     const [rows] = await pool.query(`
-      SELECT oo.id, oo.created_by, oo.overtime_workers,
-             ooi.item_name, ooi.price, ooi.quantity
+      SELECT oo.id AS order_id,
+             DATE_FORMAT(oo.order_date, '%Y-%m-%d') AS order_date,
+             oo.created_by,
+             ooi.item_name, ooi.price, ooi.quantity,
+             IFNULL(ooi.person_type, 'worker')  AS person_type,
+             IFNULL(ooi.person_id,   '')         AS person_id,
+             IFNULL(ooi.person_name, '')         AS person_name,
+             IFNULL(ooi.guest_count, 0)          AS guest_count
       FROM bento_overtime_orders oo
       JOIN bento_overtime_order_items ooi ON oo.id = ooi.overtime_order_id
       WHERE DATE(oo.order_date) >= ? AND DATE(oo.order_date) <= ?
-      ORDER BY oo.id, ooi.item_name
+      ORDER BY oo.order_date, ooi.person_type, ooi.person_id, ooi.item_name
     `, [from, to]);
 
     if (!rows.length) return res.json([]);
 
-    // 彙整每張訂單
-    const orderMap = {};
+    // 收集需要查部門的工號（加班者 person_id + 舊資料 created_by）
+    const workerIds = new Set();
+    for (const r of rows) {
+      if (r.person_type === 'worker' && r.person_id) workerIds.add(r.person_id);
+      workerIds.add(r.created_by);
+    }
+    const userInfo = await getUserInfo([...workerIds]);
+
+    // 以部門為大分類
+    const deptMap = {};
     for (const row of rows) {
-      if (!orderMap[row.id]) {
-        let workers = [];
-        try { workers = JSON.parse(row.overtime_workers || '[]'); } catch {}
-        orderMap[row.id] = { id: row.id, created_by: row.created_by, workers, items: [], order_amount: 0 };
-      }
       const amt = Number(row.price) * Number(row.quantity);
-      orderMap[row.id].items.push({ item_name: row.item_name, quantity: Number(row.quantity), amount: amt });
-      orderMap[row.id].order_amount += amt;
-    }
 
-    // 取得所有相關工號的部門/姓名
-    const allIds = new Set();
-    for (const o of Object.values(orderMap)) {
-      allIds.add(o.created_by);
-      for (const w of o.workers) allIds.add(w.id);
-    }
-    const userInfo = await getUserInfo([...allIds]);
-
-    // 以加班人員部門分群
-    const groups = {};
-    for (const order of Object.values(orderMap)) {
-      const depts = new Set(
-        order.workers.length
-          ? order.workers.map(w => userInfo[w.id]?.dept || '未分類')
-          : ['未分類']
-      );
-      for (const dept of depts) {
-        if (!groups[dept]) groups[dept] = { dept_name: dept, total_amount: 0, orders: [], itemMap: {} };
-        const g = groups[dept];
-        const deptWorkers = order.workers.filter(w => (userInfo[w.id]?.dept || '未分類') === dept);
-        g.total_amount += order.order_amount;
-        g.orders.push({
-          order_id: order.id,
-          created_by: order.created_by,
-          created_by_name: userInfo[order.created_by]?.name || '',
-          overtime_workers: deptWorkers,
-          items: order.items,
-          order_amount: order.order_amount
-        });
-        for (const item of order.items) {
-          if (!g.itemMap[item.item_name]) g.itemMap[item.item_name] = { quantity: 0, amount: 0 };
-          g.itemMap[item.item_name].quantity += item.quantity;
-          g.itemMap[item.item_name].amount += item.amount;
-        }
+      // 決定顯示分組、人員 ID 與姓名
+      let deptName, displayId, displayName;
+      if (row.person_type === 'vendor') {
+        deptName = '廠商';
+        displayId   = row.person_id   || row.created_by;
+        displayName = row.person_name || '';
+      } else if (row.person_type === 'guest') {
+        deptName = '客人';
+        displayId   = `guest_${row.order_id}`;
+        displayName = `客人 ${row.guest_count || 1} 人`;
+      } else {
+        // worker（含舊資料 person_id 為空的情況）
+        const pid = row.person_id || row.created_by;
+        deptName    = userInfo[pid]?.dept || '未分類';
+        displayId   = pid;
+        displayName = row.person_name || userInfo[pid]?.name || '';
       }
+
+      if (!deptMap[deptName]) {
+        deptMap[deptName] = { dept_name: deptName, total_amount: 0, workerSet: new Set(), personMap: {}, itemCountMap: {} };
+      }
+      const dept = deptMap[deptName];
+      dept.total_amount += amt;
+      if (row.person_type === 'worker') dept.workerSet.add(displayId);
+
+      // 人員小計
+      if (!dept.personMap[displayId]) {
+        dept.personMap[displayId] = { person_id: displayId, person_name: displayName, person_type: row.person_type, items: [], person_amount: 0 };
+      }
+      dept.personMap[displayId].items.push({ order_date: row.order_date, item_name: row.item_name, price: Number(row.price), quantity: Number(row.quantity), amount: amt });
+      dept.personMap[displayId].person_amount += amt;
+
+      // 品項小計
+      if (!dept.itemCountMap[row.item_name]) {
+        dept.itemCountMap[row.item_name] = { item_name: row.item_name, quantity: 0, amount: 0 };
+      }
+      dept.itemCountMap[row.item_name].quantity += Number(row.quantity);
+      dept.itemCountMap[row.item_name].amount   += amt;
     }
 
-    res.json(Object.values(groups).map(g => ({
-      dept_name: g.dept_name,
-      total_amount: g.total_amount,
-      orders: g.orders,
-      item_totals: Object.entries(g.itemMap).map(([name, v]) => ({ item_name: name, ...v }))
-    })).sort((a, b) => b.total_amount - a.total_amount));
+    res.json(
+      Object.values(deptMap)
+        .sort((a, b) => b.total_amount - a.total_amount)
+        .map(dept => ({
+          dept_name:    dept.dept_name,
+          total_amount: dept.total_amount,
+          worker_count: dept.workerSet.size,
+          persons:      Object.values(dept.personMap),
+          item_totals:  Object.values(dept.itemCountMap).sort((a, b) => b.quantity - a.quantity)
+        }))
+    );
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1052,9 +1337,13 @@ router.get('/overtime/summary', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/vendor/search', async (req, res) => {
   const q = (req.query.q || '').trim();
+  const by = req.query.by || 'both'; // 'id' | 'name' | 'both'
   if (!q) return res.json([]);
   try {
     const spiPool = await getSPIPool();
+    const whereField = by === 'id'   ? 'MA001 LIKE @q'
+                     : by === 'name' ? 'MA002 LIKE @q OR MA003 LIKE @q'
+                     :                 'MA001 LIKE @q OR MA002 LIKE @q OR MA003 LIKE @q';
     const rs = await spiPool.request()
       .input('q', mssql.NVarChar, `%${q}%`)
       .query(`
@@ -1063,7 +1352,7 @@ router.get('/vendor/search', async (req, res) => {
           RTRIM(LTRIM(MA002)) AS name,
           RTRIM(LTRIM(MA003)) AS full_name
         FROM [SPI_20191231].[dbo].[PURMA]
-        WHERE MA001 LIKE @q OR MA002 LIKE @q OR MA003 LIKE @q
+        WHERE ${whereField}
         ORDER BY MA001
       `);
     res.json(rs.recordset);
@@ -1078,9 +1367,13 @@ router.get('/vendor/search', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/employee/search', async (req, res) => {
   const q = (req.query.q || '').trim();
+  const by = req.query.by || 'both'; // 'id' | 'name' | 'both'
   if (!q) return res.json([]);
   try {
     const spiPool = await getSPIPool();
+    const whereField = by === 'id'   ? 'MV001 LIKE @q'
+                     : by === 'name' ? 'MV002 LIKE @q'
+                     :                 '(MV001 LIKE @q OR MV002 LIKE @q)';
     const rs = await spiPool.request()
       .input('q', mssql.NVarChar, `%${q}%`)
       .query(`
@@ -1088,7 +1381,7 @@ router.get('/employee/search', async (req, res) => {
           RTRIM(LTRIM(MV001)) AS id,
           RTRIM(LTRIM(MV002)) AS name
         FROM dbo.CMSMV
-        WHERE (MV001 LIKE @q OR MV002 LIKE @q)
+        WHERE ${whereField}
           AND MV022 = '' AND MV021 != ''
         ORDER BY MV001
       `);
@@ -1151,6 +1444,37 @@ router.delete('/overtime/eligible/:userId', async (req, res) => {
   }
 });
 
+// 切換 can_view_summary 欄位
+router.patch('/overtime/eligible/:userId/summary-perm', async (req, res) => {
+  const user = req.user;
+  if (!hasPermission(user)) return res.status(403).json({ error: '無權限' });
+  const { can_view_summary } = req.body;
+  try {
+    await pool.query(
+      'UPDATE bento_overtime_eligible SET can_view_summary = ? WHERE user_id = ?',
+      [can_view_summary ? 1 : 0, req.params.userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 查詢當前使用者是否可查看匯總頁（manager/admin 恆為 true）
+router.get('/overtime/summary-permission', async (req, res) => {
+  const user = req.user;
+  if (!user) return res.status(401).json({ error: '未登入' });
+  try {
+    const [rows] = await pool.query(
+      'SELECT can_view_summary FROM bento_overtime_eligible WHERE user_id = ?',
+      [user.SA001]
+    );
+    res.json({ canView: rows.length > 0 && rows[0].can_view_summary === 1 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 加班便當權限管理
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1182,25 +1506,42 @@ router.post('/overtime/order', async (req, res) => {
   if (!user) return res.status(401).json({ error: '未登入' });
   if (!await hasOvertimePermission(user)) return res.status(403).json({ error: '無加班便當訂購權限' });
 
-  const { items, overtimeWorkers, remark } = req.body;
+  const { items, remark } = req.body;
   if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: '請新增訂購項目' });
+
+  // 時間驗證（與一般便當相同規則，逐一檢查各品項的餐別）
+  const mealTypes = [...new Set(items.map(i => i.mealType).filter(Boolean))];
+  for (const mt of mealTypes) {
+    if (!await isValidOrderTime(mt)) {
+      const label = mt === 'lunch' ? '午餐' : '晚餐';
+      return res.status(400).json({ error: `${label}不在訂購時間內` });
+    }
+  }
 
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     const [result] = await conn.query(
-      `INSERT INTO bento_overtime_orders (created_by, order_date, overtime_workers, remark)
-       VALUES (?, CURDATE(), ?, ?)`,
-      [user.SA001, JSON.stringify(overtimeWorkers || []), remark || '']
+      `INSERT INTO bento_overtime_orders (created_by, order_date, remark) VALUES (?, CURDATE(), ?)`,
+      [user.SA001, remark || '']
     );
     const orderId = result.insertId;
 
     for (const item of items) {
       await conn.query(
         `INSERT INTO bento_overtime_order_items
-           (overtime_order_id, meal_type, vendor_name, item_name, price, quantity)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [orderId, item.mealType, item.vendorName, item.itemName, item.price || 0, item.quantity || 1]
+           (overtime_order_id, meal_type, vendor_name, item_name, price, quantity,
+            person_type, person_id, person_name, guest_count)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          orderId,
+          item.mealType, item.vendorName, item.itemName,
+          item.price || 0, item.quantity || 1,
+          item.personType  || 'worker',
+          item.personId    || '',
+          item.personName  || '',
+          item.guestCount  || 0,
+        ]
       );
     }
 
@@ -1235,7 +1576,13 @@ router.get('/overtime/orders', async (req, res) => {
         [order.id]
       );
       order.items = its;
-      try { order.overtime_workers = JSON.parse(order.overtime_workers || '[]'); } catch { order.overtime_workers = []; }
+      try {
+        const [workers] = await pool.query(
+          'SELECT worker_id AS id, worker_name AS name FROM bento_overtime_order_workers WHERE overtime_order_id = ? ORDER BY id',
+          [order.id]
+        );
+        order.overtime_workers = workers;
+      } catch { order.overtime_workers = []; }
     }
     res.json(orders);
   } catch (err) {

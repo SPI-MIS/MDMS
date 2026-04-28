@@ -3,8 +3,9 @@
     <v-card>
       <v-tabs v-model="activeTab" color="primary">
         <v-tab value="users">使用者管理</v-tab>
-        <v-tab value="time" v-if="isManager">便當時間設定</v-tab>
+        <v-tab value="time" v-if="isManager">系統時間管理</v-tab>
         <v-tab value="overtime" v-if="isManager">加班便當名單</v-tab>
+        <v-tab value="vendors" v-if="isManager">店家管理</v-tab>
       </v-tabs>
       <v-divider />
 
@@ -158,6 +159,15 @@
                     {{ item.created_at ? String(item.created_at).slice(0, 10) : '' }}
                   </td>
                   <td>
+                    <v-switch
+                      :model-value="!!item.can_view_summary"
+                      color="primary"
+                      density="compact"
+                      hide-details
+                      @update:model-value="val => toggleOTSummaryPerm(item, val)"
+                    />
+                  </td>
+                  <td>
                     <v-btn
                       icon="mdi-delete-outline"
                       variant="text"
@@ -176,11 +186,11 @@
           </v-card-text>
         </v-window-item>
 
-        <!-- 便當時間設定 -->
+        <!-- 系統時間管理 -->
         <v-window-item value="time">
           <v-card-text>
-            <div class="text-subtitle-1 mb-4">便當訂購時間設定</div>
-            <v-row>
+            <div class="text-subtitle-1 mb-1">便當訂購時間設定</div>
+            <v-row class="mb-2">
               <v-col cols="12" md="4">
                 <v-text-field
                   v-model="timeSettings.lunch_end"
@@ -208,20 +218,176 @@
                   persistent-hint
                 />
               </v-col>
-              <v-col cols="12" class="mt-2">
+              <v-col cols="12" class="mt-1">
                 <v-alert type="info" variant="tonal" density="compact">
                   目前設定：午餐於 {{ timeSettings.lunch_end }} 前可訂購；
                   晚餐於 {{ timeSettings.dinner_start }} ~ {{ timeSettings.dinner_end }} 可訂購
                 </v-alert>
               </v-col>
+            </v-row>
+
+            <v-divider class="my-4" />
+
+            <div class="text-subtitle-1 mb-1">自動登出設定</div>
+            <v-row>
+              <v-col cols="12" md="4">
+                <v-text-field
+                  v-model.number="timeSettings.auto_logout_timeout_min"
+                  label="閒置自動登出（分鐘）"
+                  type="number"
+                  min="1"
+                  max="480"
+                  hint="無操作超過此時間後自動登出，範圍 1～480 分鐘"
+                  persistent-hint
+                />
+              </v-col>
+            </v-row>
+
+            <v-row class="mt-4">
               <v-col cols="12" class="d-flex justify-end">
                 <v-btn color="primary" @click="saveTimeSettings" :loading="timeSaving">儲存設定</v-btn>
               </v-col>
             </v-row>
           </v-card-text>
         </v-window-item>
+        <!-- 店家管理 -->
+        <v-window-item value="vendors">
+          <v-card-text>
+            <div class="text-subtitle-1 mb-1">便當店家管理</div>
+            <div class="text-caption text-medium-emphasis mb-4">關閉的店家不會出現在訂購頁面。點選店家列可管理品項。</div>
+            <v-data-table
+              :headers="vendorHeaders"
+              :items="vendorList"
+              :loading="vendorLoading"
+              density="compact"
+              items-per-page="50"
+              hide-default-footer
+            >
+              <template #item="{ item }">
+                <tr
+                  :class="selectedVendorForMenu?.id === item.id ? 'bg-blue-lighten-5' : ''"
+                  style="cursor: pointer"
+                  @click="selectVendorForMenu(item)"
+                >
+                  <td>{{ item.id }}</td>
+                  <td>{{ item.name }}</td>
+                  <td @click.stop>
+                    <v-switch
+                      :model-value="!!item.is_active"
+                      color="primary"
+                      density="compact"
+                      hide-details
+                      :loading="vendorToggling === item.id"
+                      @update:model-value="toggleVendor(item)"
+                    />
+                  </td>
+                </tr>
+              </template>
+              <template #no-data>
+                <div class="text-center py-6 text-medium-emphasis">尚無店家資料</div>
+              </template>
+            </v-data-table>
+
+            <!-- 品項管理（選取店家後展開） -->
+            <template v-if="selectedVendorForMenu">
+              <v-divider class="my-4" />
+              <div class="d-flex align-center gap-3 mb-3">
+                <v-icon color="orange">mdi-silverware-fork-knife</v-icon>
+                <span class="text-subtitle-1 font-weight-medium">{{ selectedVendorForMenu.name }}　品項管理</span>
+                <v-spacer />
+                <v-btn color="primary" variant="tonal" prepend-icon="mdi-plus" size="small" @click="openMenuItemDialog(null)">
+                  新增品項
+                </v-btn>
+              </div>
+              <v-data-table
+                :headers="menuItemHeaders"
+                :items="menuItems"
+                :loading="menuItemsLoading"
+                density="compact"
+                hide-default-footer
+                items-per-page="200"
+              >
+                <template #item="{ item }">
+                  <tr>
+                    <td>{{ item.item_name_zh }}</td>
+                    <td class="text-caption text-medium-emphasis">{{ item.item_name_vi }}</td>
+                    <td class="text-caption text-medium-emphasis">{{ item.item_name_id }}</td>
+                    <td class="text-right">${{ item.price }}</td>
+                    <td>
+                      <v-switch
+                        :model-value="!!item.for_overtime"
+                        color="orange"
+                        density="compact"
+                        hide-details
+                        @update:model-value="toggleForOvertime(item)"
+                      />
+                    </td>
+                    <td>
+                      <v-switch
+                        :model-value="!!item.quantity_by_3"
+                        color="deep-orange"
+                        density="compact"
+                        hide-details
+                        @update:model-value="toggleQuantityBy3(item)"
+                      />
+                    </td>
+                    <td class="text-no-wrap">
+                      <v-btn icon="mdi-pencil-outline" variant="text" color="primary" density="compact" size="small" @click="openMenuItemDialog(item)" />
+                      <v-btn icon="mdi-delete-outline" variant="text" color="error" density="compact" size="small" @click="deleteMenuItem(item)" />
+                    </td>
+                  </tr>
+                </template>
+                <template #no-data>
+                  <div class="text-center py-4 text-medium-emphasis">此店家尚無品項，請點新增</div>
+                </template>
+              </v-data-table>
+            </template>
+          </v-card-text>
+        </v-window-item>
       </v-window>
     </v-card>
+
+    <!-- 品項新增/編輯 Dialog -->
+    <v-dialog v-model="menuItemDialog" max-width="480">
+      <v-card>
+        <v-card-title class="text-body-1 font-weight-bold pa-4 pb-2">
+          {{ menuItemForm.id ? '編輯品項' : '新增品項' }}
+          <span class="text-medium-emphasis ms-1 text-caption">（{{ selectedVendorForMenu?.name }}）</span>
+        </v-card-title>
+        <v-card-text>
+          <v-row dense>
+            <v-col cols="12">
+              <v-text-field v-model="menuItemForm.item_name_zh" label="品項名稱（中文）*" density="compact" variant="outlined" autofocus />
+            </v-col>
+            <v-col cols="12">
+              <v-text-field v-model="menuItemForm.item_name_vi" label="品項名稱（越南語）" density="compact" variant="outlined" />
+            </v-col>
+            <v-col cols="12">
+              <v-text-field v-model="menuItemForm.item_name_id" label="品項名稱（印尼語）" density="compact" variant="outlined" />
+            </v-col>
+            <v-col cols="6">
+              <v-text-field v-model.number="menuItemForm.price" label="單價 $*" type="number" min="0" density="compact" variant="outlined" />
+            </v-col>
+            <v-col cols="6" class="d-flex align-center">
+              <v-checkbox v-model="menuItemForm.for_overtime" label="加班便當可選" color="orange" density="compact" hide-details />
+            </v-col>
+          </v-row>
+        </v-card-text>
+        <v-card-actions class="pa-4 pt-0">
+          <v-spacer />
+          <v-btn variant="text" @click="menuItemDialog = false">取消</v-btn>
+          <v-btn
+            color="primary"
+            variant="tonal"
+            :loading="menuItemSaving"
+            :disabled="!menuItemForm.item_name_zh || menuItemForm.price == null"
+            @click="saveMenuItem"
+          >
+            {{ menuItemForm.id ? '更新' : '新增' }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- 查詢 Dialog -->
     <v-dialog v-model="searchDialog" max-width="860">
@@ -269,7 +435,7 @@ const { userId, userName, manager } = useAuth();
 const activeTab = ref('users')
 
 // 便當時間設定
-const timeSettings = ref({ lunch_end: '10:30', dinner_start: '13:00', dinner_end: '16:00' })
+const timeSettings = ref({ lunch_end: '10:30', dinner_start: '13:00', dinner_end: '16:00', auto_logout_timeout_min: 15 })
 const timeSaving = ref(false)
 
 async function loadTimeSettings() {
@@ -278,7 +444,8 @@ async function loadTimeSettings() {
     timeSettings.value = {
       lunch_end: data.lunch_end || '10:30',
       dinner_start: data.dinner_start || '13:00',
-      dinner_end: data.dinner_end || '16:00'
+      dinner_end: data.dinner_end || '16:00',
+      auto_logout_timeout_min: Number(data.auto_logout_timeout_min) || 15
     }
   } catch { /* 載入失敗保留預設值 */ }
 }
@@ -306,10 +473,11 @@ const otAdding = ref(false)
 const otInputRef = ref(null)
 
 const otHeaders = [
-  { title: '工號',     key: 'user_id',    width: '120px' },
-  { title: '姓名',     key: 'user_name'  },
-  { title: '新增日期', key: 'created_at', width: '120px' },
-  { title: '',         key: 'action',     width: '60px', sortable: false },
+  { title: '工號',     key: 'user_id',          width: '120px' },
+  { title: '姓名',     key: 'user_name'         },
+  { title: '新增日期', key: 'created_at',        width: '120px' },
+  { title: '可看匯總', key: 'can_view_summary',  width: '100px', sortable: false },
+  { title: '',         key: 'action',            width: '60px',  sortable: false },
 ]
 
 async function loadOTList() {
@@ -366,6 +534,15 @@ async function commitOT() {
   } finally { otAdding.value = false }
 }
 
+async function toggleOTSummaryPerm(item, val) {
+  try {
+    await api.patch(`/bento/overtime/eligible/${item.user_id}/summary-perm`, { can_view_summary: val ? 1 : 0 });
+    item.can_view_summary = val ? 1 : 0;
+  } catch (err) {
+    alert('更新失敗：' + (err.response?.data?.error || err.message));
+  }
+}
+
 async function removeOT(userId) {
   if (!confirm(`確定從名單移除 ${userId}？`)) return
   try {
@@ -376,8 +553,136 @@ async function removeOT(userId) {
   }
 }
 
+// ── 店家管理 ──────────────────────────────────────────
+const vendorList = ref([])
+const vendorLoading = ref(false)
+const vendorToggling = ref(null)
+
+const vendorHeaders = [
+  { title: 'ID',    key: 'id',        width: '80px' },
+  { title: '店家名稱', key: 'name' },
+  { title: '顯示',  key: 'is_active', width: '100px', sortable: false },
+]
+
+// ── 品項管理 ──────────────────────────────────────────
+const selectedVendorForMenu = ref(null)
+const menuItems = ref([])
+const menuItemsLoading = ref(false)
+const menuItemDialog = ref(false)
+const menuItemSaving = ref(false)
+const menuItemForm = ref({ id: null, item_name_zh: '', item_name_vi: '', item_name_id: '', price: 0 })
+
+const menuItemHeaders = [
+  { title: '中文名稱', key: 'item_name_zh'  },
+  { title: '越南語',   key: 'item_name_vi'  },
+  { title: '印尼語',   key: 'item_name_id'  },
+  { title: '單價',     key: 'price',         width: '80px',  align: 'end' },
+  { title: '加班可選', key: 'for_overtime',  width: '90px',  sortable: false },
+  { title: '3倍數',    key: 'quantity_by_3', width: '80px',  sortable: false },
+  { title: '',          key: 'actions',      width: '90px',  sortable: false },
+]
+
+async function selectVendorForMenu(vendor) {
+  selectedVendorForMenu.value = vendor
+  menuItems.value = []
+  await loadMenuItems()
+}
+
+async function loadMenuItems() {
+  if (!selectedVendorForMenu.value) return
+  menuItemsLoading.value = true
+  try {
+    const { data } = await api.get('/bento/menu-items', { params: { vendor_id: selectedVendorForMenu.value.id } })
+    menuItems.value = data
+  } catch { /* ignore */ } finally {
+    menuItemsLoading.value = false
+  }
+}
+
+function openMenuItemDialog(item) {
+  menuItemForm.value = item
+    ? { id: item.id, item_name_zh: item.item_name_zh, item_name_vi: item.item_name_vi, item_name_id: item.item_name_id, price: item.price, for_overtime: !!item.for_overtime, quantity_by_3: !!item.quantity_by_3 }
+    : { id: null, item_name_zh: '', item_name_vi: '', item_name_id: '', price: 0, for_overtime: false, quantity_by_3: false }
+  menuItemDialog.value = true
+}
+
+async function saveMenuItem() {
+  menuItemSaving.value = true
+  try {
+    const payload = {
+      vendor_id: selectedVendorForMenu.value.id,
+      item_name_zh: menuItemForm.value.item_name_zh,
+      item_name_vi: menuItemForm.value.item_name_vi,
+      item_name_id: menuItemForm.value.item_name_id,
+      price: menuItemForm.value.price,
+      for_overtime:   menuItemForm.value.for_overtime   ? 1 : 0,
+      quantity_by_3:  menuItemForm.value.quantity_by_3  ? 1 : 0,
+    }
+    if (menuItemForm.value.id) {
+      await api.put(`/bento/menu-item/${menuItemForm.value.id}`, payload)
+    } else {
+      await api.post('/bento/menu-item', payload)
+    }
+    menuItemDialog.value = false
+    await loadMenuItems()
+  } catch (err) {
+    alert('儲存失敗：' + (err.response?.data?.error || err.message))
+  } finally {
+    menuItemSaving.value = false
+  }
+}
+
+async function patchMenuItem(item, patch) {
+  try {
+    await api.put(`/bento/menu-item/${item.id}`, {
+      item_name_zh: item.item_name_zh, item_name_vi: item.item_name_vi,
+      item_name_id: item.item_name_id, price: item.price,
+      for_overtime: item.for_overtime, quantity_by_3: item.quantity_by_3,
+      ...patch,
+    });
+    Object.assign(item, patch);
+  } catch (err) {
+    alert('更新失敗：' + (err.response?.data?.error || err.message));
+  }
+}
+const toggleForOvertime = (item) => patchMenuItem(item, { for_overtime: item.for_overtime ? 0 : 1 });
+const toggleQuantityBy3 = (item) => patchMenuItem(item, { quantity_by_3: item.quantity_by_3 ? 0 : 1 });
+
+async function deleteMenuItem(item) {
+  if (!confirm(`確定刪除「${item.item_name_zh}」？`)) return
+  try {
+    await api.delete(`/bento/menu-item/${item.id}`)
+    await loadMenuItems()
+  } catch (err) {
+    alert('刪除失敗：' + (err.response?.data?.error || err.message))
+  }
+}
+
+async function loadVendors() {
+  vendorLoading.value = true
+  try {
+    const { data } = await api.get('/bento/vendors')
+    vendorList.value = data
+  } catch { /* ignore */ } finally {
+    vendorLoading.value = false
+  }
+}
+
+async function toggleVendor(item) {
+  vendorToggling.value = item.id
+  try {
+    await api.patch(`/bento/vendor/${item.id}/active`, { is_active: !item.is_active })
+    item.is_active = item.is_active ? 0 : 1
+  } catch (err) {
+    alert('更新失敗：' + (err.response?.data?.error || err.message))
+  } finally {
+    vendorToggling.value = null
+  }
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'overtime' && otList.value.length === 0) loadOTList()
+  if (tab === 'vendors' && vendorList.value.length === 0) loadVendors()
 })
 
 onMounted(() => {

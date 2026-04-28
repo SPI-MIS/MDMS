@@ -13,11 +13,16 @@ function parsePerms(raw) { try { return raw ? JSON.parse(raw) : null } catch { r
 const perms = ref(parsePerms(localStorage.getItem('perms')) || { ...defaultPerms })
 
 const isLoggedIn = ref(!!userId.value);
-const hasOvertimePerm = ref(localStorage.getItem('hasOvertimePerm') === 'true');
+const hasOvertimePerm  = ref(localStorage.getItem('hasOvertimePerm')  === 'true');
+const canViewSummary   = ref(localStorage.getItem('canViewSummary')   === 'true');
 
 const setOvertimePerm = (val) => {
   hasOvertimePerm.value = !!val;
   localStorage.setItem('hasOvertimePerm', val ? 'true' : 'false');
+};
+const setSummaryPerm = (val) => {
+  canViewSummary.value = !!val;
+  localStorage.setItem('canViewSummary', val ? 'true' : 'false');
 };
 
 const login = ({ userId: id, userName: name, manager: mgr, admin: amn, perms: p, token: t }) => {
@@ -46,11 +51,12 @@ const logout = () => {
   token.value = '';
   perms.value = { ...defaultPerms }
   hasOvertimePerm.value = false;
+  canViewSummary.value  = false;
   isLoggedIn.value = false;
   location.reload();
   window.location.replace('/');
 };
 
 export function useAuth() {
-  return { userId, userName, manager, admin, token, perms, isLoggedIn, login, logout, hasOvertimePerm, setOvertimePerm };
+  return { userId, userName, manager, admin, token, perms, isLoggedIn, login, logout, hasOvertimePerm, setOvertimePerm, canViewSummary, setSummaryPerm };
 }

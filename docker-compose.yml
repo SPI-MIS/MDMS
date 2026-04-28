@@ -4,11 +4,11 @@ services:
       context: ./backend
     container_name: website_backend
     ports:
-      - "4000:4000"
+      - "4001:4001"
     environment:
       - NODE_ENV=production
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:4001/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,11 +22,18 @@ services:
       - "80:80"
     depends_on:
       backend:
-        condition: service_healthy    # ★ 等後端健康
+        condition: service_healthy
     networks: [mdms_webnet]
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cf_tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=f71d0251-82ad-4a6b-94ee-5dace98f8c5a.cfargotunnel.com
+    networks: [mdms_webnet]
 
 networks:
   mdms_webnet:
     driver: bridge
-

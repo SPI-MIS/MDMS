@@ -21,7 +21,7 @@ export default defineConfig(({ command, mode }) => {
           //cloudflare端：
           // target: 'http://website_backend:4000',
           //開發端：
-          target: 'http://localhost:4000',
+          target: 'http://localhost:4001',
           changeOrigin: true,
           secure: false
         }

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import i18n from '@/plugins/i18n'   // 若名稱不同請調整
+import api from '@/utils/api'
 
 import Maintenance from '@/views/Maintenance.vue';
 import HomePage from '@/views/HomePage.vue';
@@ -130,7 +131,7 @@ const routes = [
     meta: {
       title: 'bento.total',
       requiresAuth: true,
-      role: 'manager'
+      role: 'bentoSummary'  // 自訂角色：manager/admin 或有 can_view_summary 的人
     }
   },
   {
@@ -160,7 +161,7 @@ const router = createRouter({
 // ⭐ 白名單（不需登入的頁面）
 const publicPages = ['/login', '/tool_excelimport', '/QAtool']
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const { isLoggedIn, admin, manager } = useAuth()
 
   const requiresAuth = !publicPages.includes(to.path)
@@ -180,24 +181,22 @@ router.beforeEach((to, from, next) => {
     const requiredRole = to.meta.role
     let hasPermission = false
 
-    // 調試日誌
-    console.log('[Router Guard] Checking permissions:', {
-      path: to.path,
-      requiredRole,
-      admin: admin.value,
-      manager: manager.value
-    })
-
-    if (requiredRole === 'admin') { hasPermission = admin.value === '1'} 
-    else if (requiredRole === 'manager') { hasPermission = manager.value === '1' || admin.value === '1' } 
-    else if (requiredRole === 'managerOnly') { hasPermission = manager.value === '1' && admin.value !== '1' }
-
-    console.log('[Router Guard] Has permission:', hasPermission)
+    if (requiredRole === 'admin') {
+      hasPermission = admin.value === '1'
+    } else if (requiredRole === 'manager') {
+      hasPermission = manager.value === '1' || admin.value === '1'
+    } else if (requiredRole === 'managerOnly') {
+      hasPermission = manager.value === '1' && admin.value !== '1'
+    } else if (requiredRole === 'bentoSummary') {
+      try {
+        const { data } = await api.get('/bento/overtime/summary-permission')
+        hasPermission = !!data.canView
+      } catch {
+        hasPermission = false
+      }
+    }
 
     if (!hasPermission) {
-      console.warn(`User does not have ${requiredRole} permission for route: ${to.path}`)
-      // 重定向到首頁並顯示無權限訊息
-      // alert(i18n.global.t('common.noPermission') || '您沒有權限訪問此頁面')
       return next('/')
     }
   }

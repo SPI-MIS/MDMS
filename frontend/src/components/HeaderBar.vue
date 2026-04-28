@@ -58,12 +58,12 @@
         <v-list-item @click="goTo(isLoggedIn ? '/bento-all-orders' : '/login')">
           <v-list-item-title>{{ $t('bento.all') }}</v-list-item-title>
         </v-list-item>
-
-        <v-list-item @click="goTo(isLoggedIn ? '/bento-summary' : '/login')">
-          <v-list-item-title>{{ $t('bento.total') }}</v-list-item-title>
-        </v-list-item>
+        
         <v-list-item v-if="hasOvertimePerm || String(manager) === '1'" @click="goTo('/bento-overtime')">
           <v-list-item-title>{{ $t('bento.overtime') }}</v-list-item-title>
+        </v-list-item>
+        <v-list-item v-if="canViewSummary" @click="goTo('/bento-summary')">
+          <v-list-item-title>{{ $t('bento.total') }}</v-list-item-title>
         </v-list-item>
       </v-list-group>
       <v-divider />
@@ -224,10 +224,11 @@ import { useRouter, useRoute } from 'vue-router';
 import { ref, onMounted, watch } from 'vue';
 import { useAuth } from '@/composables/useAuth';
 import api from '@/utils/api';
+import { globalLang } from '@/composables/useLang';
 
 const logoUrl = new URL('@/assets/logo.svg', import.meta.url).href
 const { mdAndUp } = useDisplay()
-const { isLoggedIn, logout, hasOvertimePerm, setOvertimePerm } = useAuth();
+const { isLoggedIn, logout, hasOvertimePerm, setOvertimePerm, canViewSummary, setSummaryPerm } = useAuth();
 
 const fetchOvertimePerm = async () => {
   if (!isLoggedIn.value) return;
@@ -235,6 +236,16 @@ const fetchOvertimePerm = async () => {
     const { data } = await api.get('/bento/overtime/permission');
     setOvertimePerm(data.hasPermission);
   } catch { /* 保留已快取值 */ }
+};
+
+const fetchSummaryPerm = async () => {
+  if (!isLoggedIn.value) return;
+  try {
+    const { data } = await api.get('/bento/overtime/summary-permission');
+    setSummaryPerm(!!data.canView);
+  } catch {
+    setSummaryPerm(false);
+  }
 };
 const drawer = ref(false);
 const route = useRoute();
@@ -277,17 +288,17 @@ watch(lang, (val) => {
   if (val?.key) {
     locale.value = val.key
     localStorage.setItem('lang', val.key)
-    // console.log('語系切為：', locale.value)
+    globalLang.value = val.key
   }
 })
 
-// 登入後重新檢查加班便當權限
+// 登入後重新檢查加班便當權限 + 匯總查看權限
 watch(isLoggedIn, (val) => {
-  if (val) fetchOvertimePerm();
-  else setOvertimePerm(false);
+  if (val) { fetchOvertimePerm(); fetchSummaryPerm(); }
+  else { setOvertimePerm(false); setSummaryPerm(false); }
 });
 
-// 初始化語系 + 加班便當權限（已登入時直接查）
+// 初始化語系 + 各項權限（已登入時直接查）
 onMounted(() => {
   const saved = localStorage.getItem('lang')
   if (saved) {
@@ -298,6 +309,7 @@ onMounted(() => {
     }
   }
   fetchOvertimePerm();
+  fetchSummaryPerm();
 })
 
 const onSelectLang = (lang) => {
